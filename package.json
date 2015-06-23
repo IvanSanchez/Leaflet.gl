@@ -1,0 +1,32 @@
+{
+  "name": "Leaflet.gl",
+  "version": "0.0.0",
+  "description": "WebGL goodness for LeafletJS",
+  "main": "dist/leaflet.gl.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IvanSanchez/Leaflet.gl.git"
+  },
+  "keywords": [
+    "webgl",
+    "leaflet"
+  ],
+  "author": "Iván Sánchez Ortega <ivan@sanchezortega.es>",
+  "license": "Beerware",
+  "bugs": {
+    "url": "https://github.com/IvanSanchez/Leaflet.gl/issues"
+  },
+  "devDependencies": {
+    "gobble": "^0.10.2",
+    "gobble-cli": "^0.4.2",
+    "gobble-concat": "^0.3.0",
+    "gobble-gl2js": "^0.3.0",
+    "gobble-include": "^0.3.0",
+    "gobble-uglifyjs": "^0.2.1",
+    "jsesc": "^0.5.0"
+  },
+  "scripts": {
+    "postinstall": "node_modules/gobble-cli/lib/index.js build -f dist",
+    "watch": "node_modules/gobble-cli/lib/index.js watch -f dist"
+  }
+}

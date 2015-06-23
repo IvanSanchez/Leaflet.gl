@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang='en'>
+<meta charset="utf-8">
+<head>
+	<title>Leaflet GL demo</title>
+
+	<link rel="stylesheet" href="Leaflet-1.0-dev/leaflet.css" />
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 	<script type="text/javascript" src="Leaflet-1.0-dev/leaflet.js"></script> -->
+	<script type="text/javascript" src="Leaflet-1.0-dev/leaflet-src.js"></script>
+
+	<script src="dist/Leaflet.gl.js"></script>
+<!-- 	<link rel="stylesheet" href="dist/Leaflet.gl.css" /> -->
+</head>
+<body>
+
+<!-- 	<h1>LeafletGL demo</h1> -->
+
+	<div id="map" style='width:800px; height:600px;'></div>
+	
+	<script type="text/javascript">
+
+		var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			osm = L.tileLayer(osmUrl, {maxZoom: 18, attribution: osmAttrib});
+
+		var map = L.map('map')
+				.setView([0, 0], 0)
+				.addLayer(osm);
+
+	</script>
+</body>
+</html>
