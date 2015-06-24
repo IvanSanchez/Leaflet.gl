@@ -1,5 +1,3 @@
-
-
 if (L.Browser.gl) {
 
 
@@ -9,7 +7,9 @@ if (L.Browser.gl) {
 	};
 
 	L.TileLayer.addInitHook(function(){
-		this._glBuffer = null;
+		// Cross-origin stuff needed for images to be loaded into textures.
+		// If the tileserver does not allow CORS, tiles cannot be loaded into
+		//   a canvas or a WebGL texture.
 		this.options.crossOrigin = true;
 	});
 
@@ -18,44 +18,28 @@ if (L.Browser.gl) {
 
 		onAdd: function(map) {
 			tileLayerPreviousMethods.onAdd.call(this, map);
-			map._glLayers.tile.push(this);
+
+			// Tell the map we'll be using a GL program to render ourselves, instead of
+			//   a map pane.
+			map.attachLayerToGlProgram(this, 'tile');
 		},
 
 		onRemove: function(map) {
 			tileLayerPreviousMethods.onRemove.call(this, map);
-			map._glLayers.tile.splice(map._glLayers.tile.indexOf(this), 1);
+
+			map.detachLayerFromGlProgram(this, 'tile');
 		},
 
+		// Prevent creating an element and adding it to a map pane by doing nothing here.
 		_initContainer: function() {},
-	//
-	//
-	// // 	_initTile: function(tile) {
-	// //
-	// //
-	// // 	},
-	//
-	//
-	// // 	_addTile: function(coords, container) {
-	// //
-	// // 	},
-	//
-	//
-	// 	createTile: function (coords, done) {
-	// 		console.log(coords);
-	//
-	// 	},
-	//
-	//
-	// 	_tileOnLoad: function(done, tile) {},
-	//
-	// 	_tileOnError: function(done, tile, e) {},
 
+
+		// When the underlying image is done, create triangles
+		//   and add texture.
 		_tileReady: function(tileCoords, err, tile) {
-			// When the underlying image is done, create triangles
-			//   and add texture.
-	// console.log(coords);
-	// 		console.log(crsCoords.min, crsCoords.max);
-	// 		console.log(this._tileCoordsToBounds(tileCoords).toBBoxString());
+// console.log(coords);
+// 		console.log(crsCoords.min, crsCoords.max);
+// 		console.log(this._tileCoordsToBounds(tileCoords).toBBoxString());
 
 			if (!this._map) { return; }
 
@@ -74,8 +58,8 @@ if (L.Browser.gl) {
 
 			tile.loaded = +new Date();
 			tile.crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
-// 			tile.el.crossOrigin = 'Anonymous';
 			tile.texture = L.GlUtil.initTexture(this._map._gl, tile.el);
+			tile.age = performance.now();
 
 			this.fire('tileload', {
 				tile: tile.el,
@@ -87,14 +71,9 @@ if (L.Browser.gl) {
 				this.fire('load');
 			}
 
-	// 		var gl = this._map._gl;
-	// 		tile.texture = gl.createTexture();
-	//
-	// 		gl.bindTexture(gl.TEXTURE_2D, texture);
-	// 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-			this._invalidateGlVertexBuffer();
-			this._map._glRender();
+			// The fade-in animation will run for 500 milliseconds, as coded in
+			//   the fragment shader.
+			this._map.glRenderUntil(500);
 		},
 
 
@@ -109,13 +88,9 @@ if (L.Browser.gl) {
 				scale = crs.scale(coords.z),
 				nwPoint = coords.multiplyBy(tileSize),
 				sePoint = nwPoint.add([tileSize, tileSize]);
-	// console.log(scale);
 
 			nwPoint = transformation.untransform(nwPoint, scale);
 			sePoint = transformation.untransform(sePoint, scale);
-
-	// nw = map.wrapLatLng(map.unproject(nwPoint, coords.z)),
-	// se = map.wrapLatLng(map.unproject(sePoint, coords.z));
 
 			return new L.Bounds(nwPoint, sePoint);
 		},
@@ -124,7 +99,9 @@ if (L.Browser.gl) {
 			var tile = this._tiles[key];
 			if (!tile) { return; }
 
-			this._map._gl.deleteTexture(tile.texture);
+// 			console.log('remove ', key, performance.now());
+
+			this._map.getGlContext().deleteTexture(tile.texture);
 
 			delete this._tiles[key];
 
@@ -136,20 +113,27 @@ if (L.Browser.gl) {
 
 		_invalidateGlVertexBuffer: function(){
 			this._glVertexBuffer = null;
-
 		},
 
-		getGlVertexBuffer: function(){
 
-			if (this._glVertexBuffer) { return this._glVertexBuffer; }
+		// Cache buffers with data needed to render the tiles.
+		// This includes the vertices array, textures, and all
+		//   per-vertex attributes needed.
+		_getGlBuffers: function(){
+
+			if (this._glBuffers) {
+				return this._glBuffers;
+			}
 
 			var length = Object.keys(this._tiles).length;
+			var gl = this._map.getGlContext();
 // 			console.log(length, this._tiles);
 
 			// Each tile is represented by 2 triangles in a triangle strip
 			//   = 4 coordinate pairs = 8 floats.
-			var vertices = new Float32Array(length * 8);
+			var vertices      = new Float32Array(length * 8);
 			var textureCoords = new Float32Array(length * 8);
+			var tileAge       = new Float32Array(length * 4);
 			var i = 0, j = 0;
 			var textures = [];
 
@@ -165,12 +149,20 @@ if (L.Browser.gl) {
 // 						coords.min.x, coords.min.y
 					], i);
 
+					// All textures cover the entire geometry
 					textureCoords.set([
 						0, 1,
 						1, 1,
 						0, 0,
 						1, 0,
 					], i);
+
+					tileAge.set([
+						this._tiles[key].age,
+						this._tiles[key].age,
+						this._tiles[key].age,
+						this._tiles[key].age
+					], j);
 
 					textures[j] = this._tiles[key].texture;
 					i += 8;	// Float count
@@ -180,26 +172,45 @@ if (L.Browser.gl) {
 
 // 			console.log('New tilelayer vertices: ', vertices, i);
 
-			this._glVertexBuffer = L.GlUtil.initBuffer(this._map._gl, vertices, this._map._gl.DYNAMIC_DRAW);
-			this._glVertexBuffer.length = j;	// Vertex count
-			this._glVertexBuffer.textures = textures;
-			this._glVertexBuffer.textureCoordsBuffer =
-				L.GlUtil.initBuffer(this._map._gl, textureCoords, this._map._gl.DYNAMIC_DRAW);
-			return this._glVertexBuffer;
+			return {
+				vertices: L.GlUtil.initBuffer(gl, vertices, gl.DYNAMIC_DRAW),
+				textureCoords: L.GlUtil.initBuffer(gl, textureCoords, gl.DYNAMIC_DRAW),
+				textures: textures,
+				tileAge: L.GlUtil.initBuffer(gl, tileAge, gl.DYNAMIC_DRAW),
+				length: j	// vertex count
+			};
+		},
+
+
+
+		// This is run by the map whenever the layer must re-render itself.
+		// glRender() must re-attach vertices&attributes buffers,
+		//    layer-specific uniforms, and do the low-level calls to render
+		//    whatever geometries are needed.
+		glRender: function(program) {
+			var gl = this._map.getGlContext();
+			var buffers = this._getGlBuffers();
+
+			L.GlUtil.bindBufferToAttrib(gl,
+				buffers.vertices, program.attributes.aCRSCoords, 2, gl.FLOAT);
+			L.GlUtil.bindBufferToAttrib(gl,
+				buffers.textureCoords, program.attributes.aTextureCoords, 2, gl.FLOAT);
+			L.GlUtil.bindBufferToAttrib(gl,
+				buffers.tileAge, program.attributes.aAge, 1, gl.FLOAT);
+
+			// Render tiles one by one. Bit inefficient, but simpler at
+			//   this stage in development.
+			for (var j=0; j< buffers.length; j+=4) {
+
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_2D, buffers.textures[j]);
+				gl.uniform1i(program.uniforms.uTexture, 0);
+
+				gl.drawArrays(gl.TRIANGLE_STRIP, j, 4);
+// 				gl.drawArrays(gl.LINE_LOOP, j, 4);
+			}
 		}
 
-
-
-	//
-	// 	bringToFront: function () {},
-	// 	bringToBack: function () {},
-	//
-	// // 	_updateOpacity: function () {}	/// FIXME
-	//
-	//
-	//
-
 	});
-
 
 }

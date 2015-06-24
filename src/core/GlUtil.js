@@ -66,12 +66,23 @@ L.GlUtil = !L.Browser.gl ? {} : {
 		var tex = gl.createTexture();
 		gl.bindTexture(gl.TEXTURE_2D, tex);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 // 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
 		gl.generateMipmap(gl.TEXTURE_2D);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		return tex;
+	},
+
+	// Shorthand for bindBuffer + vertexAttribPointer
+	bindBufferToAttrib: function(glContext, buffer, attrib, size, type) {
+		glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
+
+		// attrib index, size, type, normalized (into [-1,1] or [0,1]),
+		// stride (when skiping items), pointer (when start at non-zero)
+		glContext.vertexAttribPointer(attrib, size, type, false, 0, 0);
 	}
 
 };

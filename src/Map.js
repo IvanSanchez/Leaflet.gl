@@ -16,19 +16,26 @@ L.Map.include(!L.Browser.gl ? {} : {
 		this._glCanvas.style.height = size.y + 'px';	/// TODO: Resize handler
 		this._glCanvas.width  = size.x;
 		this._glCanvas.height = size.y;	/// TODO: Resize handler
-		this._gl = this._glCanvas.getContext(L.Browser.gl);
-
-		this._glLayers = {
-			tile: [],
-			shadow: [],
-			vector: [],
-			marker: []
-		}
+		var gl = this._gl = this._glCanvas.getContext(L.Browser.gl, {premultipliedAlpha:false});
 
 		this._glCreatePrograms();
 
-		this.on('move zoom moveend zoomend', this._glRender, this);
 
+		gl.viewportWidth  = this._glCanvas.width;
+		gl.viewportHeight = this._glCanvas.height;
+
+
+		// When clearing the canvas, set pixels to grey transparent
+		// This will make the fade-ins a bit prettier.
+		gl.clearColor(0.5, 0.5, 0.5, 0);
+
+
+		// Blending is needed for map tiles to be faded in
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+
+		this.on('move zoom moveend zoomend', this.glRenderOnce, this);
 	},
 
 
@@ -38,32 +45,99 @@ L.Map.include(!L.Browser.gl ? {} : {
 		var gl = this._gl;
 		var crs2clipspace = include('crs2clipspace.v.js');
 
-		var tileProgram = L.GlUtil.createProgram(this._gl,
+		var tileProgram = L.GlUtil.createProgram(gl,
 			crs2clipspace + '\n' + include('tile.v.js'),	// Vertex shader
 			include('tile.f.js'),	// Fragment shader
-			['aCRSCoords', 'aTextureCoords'],	// Attributes
-			['uCenter', 'uHalfViewportSize', 'uTexture']	// Uniforms
+			['aCRSCoords', 'aTextureCoords', 'aAge'],	// Attributes
+			['uCenter', 'uHalfViewportSize', 'uNow', 'uTexture']	// Uniforms
 		);
+
+		// We're assuming all attributes will be in arrays
+		for (var attrib in tileProgram.attributes) {
+			gl.enableVertexAttribArray(tileProgram.attributes[attrib]);
+		}
+
 
 		this._glPrograms = {
 			tile: tileProgram
 		};
 
-		this._glBuffers = {
-			tileVertices: null
-		};
-
-// 		gl.bindBuffer(gl.ARRAY_BUFFER, this._glBuffers.tileVertices);
-// 		gl.bufferData(gl.ARRAY_BUFFER, demoTile, gl.STATIC_DRAW);
-//
-// 		this._glBuffers.tileVertices.itemSize = 2;	// Two floats per vertex
-// 		this._glBuffers.tileVertices.numItems = 6;	// Six vertices per tile (two triangles)
-//
+		// Stores which layers uses which program.
+		this._glLayers = {
+			tile: [],
+// 			shadow: [],
+// 			vector: [],
+// 			marker: []
+		}
 
 	},
 
 
+	// GL layers will want to tell the map which GL program they want
+	//   to use when rendering (akin to the map panes in non-GL).
+	attachLayerToGlProgram: function(layer, programName) {
+		if (!(programName in this._glLayers)) {
+			throw new Error('Layer tried to attach to a non-existing GL program');
+		}
+		this._glLayers[programName].push(layer);
+		return this;
+	},
+
+	// Reverse of attachLayerToGlProgram
+	detachLayerFromGlProgram: function(layer, programName) {
+		if (!(programName in this._glLayers)) {
+			throw new Error('Layer tried to detach from a non-existing GL program');
+		}
+		this._glLayers[programName].splice(
+			this._glLayers[programName].indexOf(layer), 1);
+		return this;
+	},
+
+	// Exposes this._gl
+	getGlContext: function() {
+		return this._gl;
+	},
+
+
+	// Start the GL rendering loop.
+	// Receives a number of milliseconds - how long to keep requesting
+	//   animation frames and re-rendering the GL canvas.
+	// This can be zero milliseconds, which means "render just once"
+	glRenderUntil: function(milliseconds) {
+		if (!this._glEndTime) {
+			this._glEndTime = performance.now() + milliseconds;
+			this._glRender();
+		} else {
+			this._glEndTime = Math.max(
+				performance.now() + milliseconds,
+				this._glEndTime
+			);
+		}
+		return this;
+	},
+
+
+	// Ask for the scene to be rendered once, but only if a GL render loop
+	//   is not already active.
+	glRenderOnce: function() {
+		if (!this._glEndTime) {
+			this._glRender();
+		}
+		return this;
+	},
+
+
+
 	_glRender: function() {
+
+		var now = performance.now();
+
+		if (this._glEndTime && this._glEndTime > now) {
+			L.Util.requestAnimFrame(this._glRender, this);
+		} else {
+			this._glEndTime = null;
+		}
+
 
 		var gl = this._gl;
 
@@ -82,12 +156,12 @@ L.Map.include(!L.Browser.gl ? {} : {
 // 		gl.drawingBufferWidth  = size.x;
 // 		gl.drawingBufferHeight = size.y;
 		gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+// 		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 // 		gl.viewport(0, 0, size.x, size.y);
-		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-// 		var halfSize = this.getSize().divideBy(2);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		var projectedCenter = this.options.crs.project(this.getCenter()).round();
-		var projectedCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize())).round();
+		var projectedCenter = this.options.crs.project(this.getCenter());
+		var projectedCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
 		var halfSize = projectedCorner.subtract(projectedCenter);	// In CRS units
 
 
@@ -96,55 +170,20 @@ L.Map.include(!L.Browser.gl ? {} : {
 		var i;
 		if (this._glLayers.tile.length) {
 
-			/// TODO:
-			/// - use the tile program
-			/// - rebind attribute arrays
-			/// - rebind vertex attribute pointers
-			/// - rebind uniforms
-
-
-// 			this._glBuffers.tileVertices.itemSize = 2;	// Two floats per vertex
-// 			this._glBuffers.tileVertices.numItems = 6;	// Six vertices per tile (two triangles)
-
+			// Activate the program
 			var program = this._glPrograms.tile;
 			gl.useProgram(program);
 
+			// Push some uniforms
 			gl.uniform2f(program.uniforms.uCenter, projectedCenter.x, projectedCenter.y);
 			gl.uniform2f(program.uniforms.uHalfViewportSize, halfSize.x, halfSize.y);
-// 			gl.uniform2f(program.uniforms.uCenter, 0.0, 0.0);
-// 			gl.uniform2f(program.uniforms.uHalfViewportSize, 2.0, 1.0);
+			gl.uniform1f(program.uniforms.uNow, performance.now());
 
-			gl.enableVertexAttribArray(program.attributes.aCRSCoords);
-			gl.enableVertexAttribArray(program.attributes.aTextureCoords);
-
-
+			// Let each layer render itself using the program they need.
+			// The layer will rebind vertex arrays and vertex attrib arrays
 			for (i in this._glLayers.tile) {
-
-				var vertexBuffer = this._glLayers.tile[i].getGlVertexBuffer();
-
-				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-				gl.vertexAttribPointer(program.attributes.aCRSCoords, 2, gl.FLOAT, false, 0, 0);
-				gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer.textureCoordsBuffer);
-				gl.vertexAttribPointer(program.attributes.aTextureCoords, 2, gl.FLOAT, false, 0, 0);
-
-				// Render tiles one by one. Bit inefficient, but simpler at
-				//   this stage in development.
-				for (var j=0; j< vertexBuffer.length; j++) {
-
-					gl.activeTexture(gl.TEXTURE0);
-					gl.bindTexture(gl.TEXTURE_2D, vertexBuffer.textures[j*4]);
-					gl.uniform1i(program.uniforms.uTexture, 0);
-
-// 					gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexBuffer.length);
-					gl.drawArrays(gl.TRIANGLE_STRIP, j*4, 4);
-// 					gl.drawArrays(gl.LINE_LOOP, 0, vertexBuffer.length);
-// 					gl.drawArrays(gl.LINE_LOOP, j*4, 4);
-				}
-
+				this._glLayers.tile[i].glRender(program);
 			}
-
-
-
 
 		}
 	}
