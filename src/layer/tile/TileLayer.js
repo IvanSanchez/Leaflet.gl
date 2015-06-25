@@ -56,10 +56,12 @@ if (L.Browser.gl) {
 			tile = this._tiles[key];
 			if (!tile) { return; }
 
+			// Store a few things needed to later create the GL buffers.
 			tile.loaded = +new Date();
 			tile.crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
 			tile.texture = L.GlUtil.initTexture(this._map._gl, tile.el);
 			tile.age = performance.now();
+			tile.tileZoom
 
 			this.fire('tileload', {
 				tile: tile.el,
@@ -130,24 +132,27 @@ if (L.Browser.gl) {
 // 			console.log(length, this._tiles);
 
 			// Each tile is represented by 2 triangles in a triangle strip
-			//   = 4 coordinate pairs = 8 floats.
-			var vertices      = new Float32Array(length * 8);
+			//   = 6 coordinate pairs = 12 floats.
+			var vertices      = new Float32Array(length * 12);
 			var textureCoords = new Float32Array(length * 8);
 			var tileAge       = new Float32Array(length * 4);
-			var i = 0, j = 0;
+			var i = 0;
 			var textures = [];
 
 			for (var key in this._tiles) {
-				if (this._tiles[key].loaded) {
-					var coords = this._tiles[key].crsCoords;
+				var tile = this._tiles[key];
+				if (tile.loaded) {
+
+					var coords = tile.crsCoords;
+					var tileZoom = tile.coords.z;
 					vertices.set([
-						coords.min.x, coords.min.y,
-						coords.max.x, coords.min.y,
-// 						coords.max.x, coords.max.y,
-						coords.min.x, coords.max.y,
-						coords.max.x, coords.max.y,
-// 						coords.min.x, coords.min.y
-					], i);
+						coords.min.x, coords.min.y, tileZoom,
+						coords.max.x, coords.min.y, tileZoom,
+// 						coords.max.x, coords.max.y, tileZoom,
+						coords.min.x, coords.max.y, tileZoom,
+						coords.max.x, coords.max.y, tileZoom,
+// 						coords.min.x, coords.min.y, tileZoom
+					], i * 12);	// Insert at index (tile count * 12)
 
 					// All textures cover the entire geometry
 					textureCoords.set([
@@ -155,18 +160,17 @@ if (L.Browser.gl) {
 						1, 1,
 						0, 0,
 						1, 0,
-					], i);
+					], i * 8);
 
 					tileAge.set([
-						this._tiles[key].age,
-						this._tiles[key].age,
-						this._tiles[key].age,
-						this._tiles[key].age
-					], j);
+						tile.age,
+						tile.age,
+						tile.age,
+						tile.age
+					], i * 4);
 
-					textures[j] = this._tiles[key].texture;
-					i += 8;	// Float count
-					j += 4;	// Vertex count
+					textures[i] = this._tiles[key].texture;
+					i ++;	// Tile count
 				}
 			}
 
@@ -177,7 +181,7 @@ if (L.Browser.gl) {
 				textureCoords: L.GlUtil.initBuffer(gl, textureCoords, gl.DYNAMIC_DRAW),
 				textures: textures,
 				tileAge: L.GlUtil.initBuffer(gl, tileAge, gl.DYNAMIC_DRAW),
-				length: j	// vertex count
+				length: i	// tile count
 			};
 		},
 
@@ -192,7 +196,7 @@ if (L.Browser.gl) {
 			var buffers = this._getGlBuffers();
 
 			L.GlUtil.bindBufferToAttrib(gl,
-				buffers.vertices, program.attributes.aCRSCoords, 2, gl.FLOAT);
+				buffers.vertices, program.attributes.aCRSCoords, 3, gl.FLOAT);
 			L.GlUtil.bindBufferToAttrib(gl,
 				buffers.textureCoords, program.attributes.aTextureCoords, 2, gl.FLOAT);
 			L.GlUtil.bindBufferToAttrib(gl,
@@ -200,13 +204,14 @@ if (L.Browser.gl) {
 
 			// Render tiles one by one. Bit inefficient, but simpler at
 			//   this stage in development.
-			for (var j=0; j< buffers.length; j+=4) {
+			for (var i=0; i< buffers.length; i++) {
 
 				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, buffers.textures[j]);
+				gl.bindTexture(gl.TEXTURE_2D, buffers.textures[i]);
 				gl.uniform1i(program.uniforms.uTexture, 0);
 
-				gl.drawArrays(gl.TRIANGLE_STRIP, j, 4);
+				// A tile is two triangles = 4 vertices
+				gl.drawArrays(gl.TRIANGLE_STRIP, i * 4, 4);
 // 				gl.drawArrays(gl.LINE_LOOP, j, 4);
 			}
 		}

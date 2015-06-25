@@ -1,6 +1,7 @@
 
-var previousMethods = {
-	_initLayout: L.Map.prototype._initLayout
+var previousMapMethods = {
+	_initLayout: L.Map.prototype._initLayout,
+	_resetView: L.Map.prototype._resetView,
 };
 
 
@@ -8,7 +9,7 @@ L.Map.include(!L.Browser.gl ? {} : {
 
 	_initLayout: function() {
 
-		previousMethods._initLayout.call(this);
+		previousMapMethods._initLayout.call(this);
 
 		var size = this.getSize();
 		this._glCanvas = L.DomUtil.create('canvas', 'leaflet-webgl', this._container);
@@ -35,7 +36,11 @@ L.Map.include(!L.Browser.gl ? {} : {
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 
-		this.on('move zoom moveend zoomend', this.glRenderOnce, this);
+
+		this.on('move moveend', this.glRenderOnce, this);
+		this.on('zoomanim', this._onGlZoomAnimationStart, this);
+		this.on('zoomend', this._onGlZoomAnimationEnd, this);
+
 	},
 
 
@@ -105,6 +110,7 @@ L.Map.include(!L.Browser.gl ? {} : {
 	// This can be zero milliseconds, which means "render just once"
 	glRenderUntil: function(milliseconds) {
 		if (!this._glEndTime) {
+			this.fire('glRenderStart', {now: performance.now()});
 			this._glEndTime = performance.now() + milliseconds;
 			this._glRender();
 		} else {
@@ -121,21 +127,86 @@ L.Map.include(!L.Browser.gl ? {} : {
 	//   is not already active.
 	glRenderOnce: function() {
 		if (!this._glEndTime) {
+			this._glEndTime = 1;
 			this._glRender();
 		}
 		return this;
 	},
 
 
+	// Capture start/end center/halfsize when starting a zoom animation
+	//   (triggered by 'zoomanim')
+	// Could also be added to Map.ZoomAnimation._animateZoom
+	_onGlZoomAnimationStart: function(ev) {
+		var startCenter = this.options.crs.project(this.getCenter());
+		var startCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
+		var startHalfSize = startCorner.subtract(startCenter);
 
+		var endCenter   = this.options.crs.project(this._animateToCenter);
+		var endHalfSize = startHalfSize.divideBy(this.getZoomScale(this._animateToZoom, this._zoom));
+
+		this._glZoomAnimation = {
+			start: {center: startCenter, halfSize: startHalfSize },
+			end:   {center: endCenter,   halfSize: endHalfSize },
+			until: performance.now() + 150
+		}
+
+		this.glRenderUntil(250);
+	},
+
+
+	// Cancels a zoom animation (triggered on 'zoomend' when the animation is over)
+	// Could also be added to Map.ZoomAnimation._onZoomTransitionEnd
+	_onGlZoomAnimationEnd: function(ev) {
+		this._glZoomAnimation = null;
+	},
+
+
+	// Returns the maps' center and half size, in CRS units,
+	//   taking animations into account.
+	_glGetViewport: function() {
+		var center = null;
+		var halfSize = null;
+		if (this._glZoomAnimation) {
+			var anim = this._glZoomAnimation;
+
+			// From 0 (animation started) to 1 (animation ended)
+			var t = 1 - ((anim.until - performance.now()) / 250);
+
+			// Map [0,1] to the bezier curve value and clamp to a max of 1, as
+			//   the animation might run for one frame after it's needed.
+			t = Math.min(L.GlUtil.cubicBezierInterpolation(t, 0, 0, 0.25, 1), 1);
+			var s = 1-t;
+
+			// Interpolate center and halfsize
+			center   = anim.end.center.multiplyBy(t).add(anim.start.center.multiplyBy(s));
+			halfSize = anim.end.halfSize.multiplyBy(t).add(anim.start.halfSize.multiplyBy(s));
+
+		} else {	// Default, no animation whatsoever
+			center = this.options.crs.project(this.getCenter());
+			var corner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
+			halfSize = corner.subtract(center);
+		}
+
+		return {
+			center: center,
+			halfSize: halfSize
+		}
+	},
+
+
+	// Renders one frame by setting the viewport uniforms and letting layers
+	//   render themselves.
+	// Also controls the main render loop, requesting the next animFrame or stopping
+	//   the loop if no more rendering is needed.
 	_glRender: function() {
-
 		var now = performance.now();
 
 		if (this._glEndTime && this._glEndTime > now) {
 			L.Util.requestAnimFrame(this._glRender, this);
 		} else {
 			this._glEndTime = null;
+			this.fire('glRenderEnd', {now: performance.now()});
 		}
 
 
@@ -164,8 +235,8 @@ L.Map.include(!L.Browser.gl ? {} : {
 		var projectedCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
 		var halfSize = projectedCorner.subtract(projectedCenter);	// In CRS units
 
-
-// 		console.log('Triggering render with viewport: ', projectedCenter, halfSize);
+		// Fetch center, half size in CRS units
+		var viewport = this._glGetViewport();
 
 		var i;
 		if (this._glLayers.tile.length) {
@@ -175,8 +246,8 @@ L.Map.include(!L.Browser.gl ? {} : {
 			gl.useProgram(program);
 
 			// Push some uniforms
-			gl.uniform2f(program.uniforms.uCenter, projectedCenter.x, projectedCenter.y);
-			gl.uniform2f(program.uniforms.uHalfViewportSize, halfSize.x, halfSize.y);
+			gl.uniform2f(program.uniforms.uCenter, viewport.center.x, viewport.center.y);
+			gl.uniform2f(program.uniforms.uHalfViewportSize, viewport.halfSize.x, viewport.halfSize.y);
 			gl.uniform1f(program.uniforms.uNow, performance.now());
 
 			// Let each layer render itself using the program they need.
@@ -184,8 +255,13 @@ L.Map.include(!L.Browser.gl ? {} : {
 			for (i in this._glLayers.tile) {
 				this._glLayers.tile[i].glRender(program);
 			}
-
 		}
+
+		// A bit of accounting will come in handy for debugging.
+		var end = performance.now();
+		var frameTime = end - now;
+		var fps = 1000 / frameTime;
+		this.fire('glRender', {now: end, frameTime: frameTime, fps: fps});
 	}
 });
 
