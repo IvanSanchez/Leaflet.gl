@@ -2,4 +2,7 @@ node_modules
 .gobble-build/
 .gobble-watch/
 .gobble/
-dist/*.map
+dist/*
+Leaflet-1.0-dev/*
+*~
+
