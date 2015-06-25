@@ -139,6 +139,8 @@ L.Map.include(!L.Browser.gl ? {} : {
 	},
 
 
+	_glZoomAnimationDuration: 250,
+
 	// Capture start/end center/halfsize when starting a zoom animation
 	//   (triggered by 'zoomanim')
 	// Could also be added to Map.ZoomAnimation._animateZoom
@@ -153,10 +155,10 @@ L.Map.include(!L.Browser.gl ? {} : {
 		this._glZoomAnimation = {
 			start: {center: startCenter, halfSize: startHalfSize },
 			end:   {center: endCenter,   halfSize: endHalfSize },
-			until: performance.now() + 150
+			until: performance.now() + this._glZoomAnimationDuration
 		}
 
-		this.glRenderUntil(250);
+		this.glRenderUntil(this._glZoomAnimationDuration);
 	},
 
 
@@ -176,11 +178,16 @@ L.Map.include(!L.Browser.gl ? {} : {
 			var anim = this._glZoomAnimation;
 
 			// From 0 (animation started) to 1 (animation ended)
-			var t = 1 - ((anim.until - performance.now()) / 250);
+			var t = 1 - ((anim.until - performance.now()) / this._glZoomAnimationDuration);
 
 			// Map [0,1] to the bezier curve value and clamp to a max of 1, as
 			//   the animation might run for one frame after it's needed.
-			t = Math.min(L.GlUtil.cubicBezierInterpolation(t, 0, 0, 0.25, 1), 1);
+			// This should really be a Bezier curve, but as the implementation is
+			//   completely buggy (see #2), let's fake it with an reverse parabola
+			//   for the time being.
+// 			t = Math.min(L.GlUtil.cubicBezierInterpolation(t, 0, 0, 0.25, 1), 1);
+// 			t = Math.min(t, 1);
+			t = Math.min(t, 1); t = 1 - (1-t) * (1-t);
 			var s = 1-t;
 
 			// Interpolate center and halfsize
