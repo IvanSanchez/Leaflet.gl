@@ -37,6 +37,11 @@ L.Map.include(!L.Browser.gl ? {} : {
 		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 
 
+		// Depth buffer is needed for rendering things on top of other things with
+		//   an explicit order
+		gl.enable(gl.DEPTH_TEST);
+
+
 		this.on('move moveend', this.glRenderOnce, this);
 		this.on('zoomanim', this._onGlZoomAnimationStart, this);
 		this.on('zoomend', this._onGlZoomAnimationEnd, this);
@@ -54,7 +59,7 @@ L.Map.include(!L.Browser.gl ? {} : {
 			crs2clipspace + '\n' + include('tile.v.js'),	// Vertex shader
 			include('tile.f.js'),	// Fragment shader
 			['aCRSCoords', 'aTextureCoords', 'aAge'],	// Attributes
-			['uCenter', 'uHalfViewportSize', 'uNow', 'uTexture']	// Uniforms
+			['uCenter', 'uHalfViewportSize', 'uNow', 'uTexture', 'uTileZoom']	// Uniforms
 		);
 
 		// We're assuming all attributes will be in arrays

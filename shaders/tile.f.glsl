@@ -14,7 +14,7 @@ uniform sampler2D uTexture;
 uniform float uNow;
 
 // Duration of the tile fade-in animation, in milliseconds
-#define fadeInTime 500.0
+#define fadeInTime 200.0
 
 void main(void) {
 // 	gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);

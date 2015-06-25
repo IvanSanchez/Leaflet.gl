@@ -195,6 +195,8 @@ if (L.Browser.gl) {
 			var gl = this._map.getGlContext();
 			var buffers = this._getGlBuffers();
 
+			gl.uniform1f(program.uniforms.uTileZoom, this._tileZoom);
+
 			L.GlUtil.bindBufferToAttrib(gl,
 				buffers.vertices, program.attributes.aCRSCoords, 3, gl.FLOAT);
 			L.GlUtil.bindBufferToAttrib(gl,
