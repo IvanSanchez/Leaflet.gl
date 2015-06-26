@@ -1,10 +1,6 @@
-if (L.Browser.gl) {
+if (L.Browser.gl) { (function(){
 
-
-	var tileLayerPreviousMethods = {
-		onAdd: L.TileLayer.prototype.onAdd,
-		onRemove: L.TileLayer.prototype.onRemove,
-	};
+	var tileLayerProto = L.extend({}, L.TileLayer.prototype);
 
 	L.TileLayer.addInitHook(function(){
 		// Cross-origin stuff needed for images to be loaded into textures.
@@ -17,7 +13,7 @@ if (L.Browser.gl) {
 	L.TileLayer.include({
 
 		onAdd: function(map) {
-			tileLayerPreviousMethods.onAdd.call(this, map);
+			tileLayerProto.onAdd.call(this, map);
 
 			// Tell the map we'll be using a GL program to render ourselves, instead of
 			//   a map pane.
@@ -33,7 +29,7 @@ if (L.Browser.gl) {
 		},
 
 		onRemove: function(map) {
-			tileLayerPreviousMethods.onRemove.call(this, map);
+			tileLayerProto.onRemove.call(this, map);
 
 			map.detachLayerFromGlProgram(this, 'tile');
 		},
@@ -225,4 +221,4 @@ if (L.Browser.gl) {
 
 	});
 
-}
+})(); }
