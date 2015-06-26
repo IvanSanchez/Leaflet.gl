@@ -28,17 +28,22 @@ L.GlUtil = !L.Browser.gl ? {} : {
 
 		program.attributes = {};
 		program.uniforms = {};
-		var i;
+		var i, location, name;
 		if (attributeNames && attributeNames.length) {
 			for (i=0; i<attributeNames.length; i++) {
-				program.attributes[attributeNames[i]] =
-					gl.getAttribLocation(program, attributeNames[i]);
+				name = attributeNames[i];
+				location = gl.getAttribLocation(program, name);
+				if (location === -1) { throw new Error('Attribute ' + name + ' not found in shaders');}
+				program.attributes[name] = location
 			}
 		}
 		if (uniformNames && uniformNames.length) {
 			for (i=0; i<uniformNames.length; i++) {
-				program.uniforms[uniformNames[i]] =
-					gl.getUniformLocation(program, uniformNames[i]);
+				name = uniformNames[i];
+				location = gl.getUniformLocation(program, name);
+				if (location === -1) { throw new Error('Uniform ' + name + ' not found in shaders');}
+				program.uniforms[name] = location;
+
 			}
 		}
 

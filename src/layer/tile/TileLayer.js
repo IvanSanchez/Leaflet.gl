@@ -21,6 +21,14 @@ if (L.Browser.gl) {
 
 			// Tell the map we'll be using a GL program to render ourselves, instead of
 			//   a map pane.
+			// Programs are reused between layers which share a program with the same
+			//   name.
+			map.registerGlProgram('tile', 1,
+				include('tile.v.js'),	// Vertex shader
+				include('tile.f.js'),	// Fragment (pixel) shader
+				['aCRSCoords', 'aTextureCoords', 'aAge'],	// Attributes
+				['uNow', 'uTexture', 'uTileZoom']	// Uniforms
+			);
 			map.attachLayerToGlProgram(this, 'tile');
 		},
 
@@ -37,10 +45,6 @@ if (L.Browser.gl) {
 		// When the underlying image is done, create triangles
 		//   and add texture.
 		_tileReady: function(tileCoords, err, tile) {
-// console.log(coords);
-// 		console.log(crsCoords.min, crsCoords.max);
-// 		console.log(this._tileCoordsToBounds(tileCoords).toBBoxString());
-
 			if (!this._map) { return; }
 
 			if (err) {
@@ -191,11 +195,12 @@ if (L.Browser.gl) {
 		// glRender() must re-attach vertices&attributes buffers,
 		//    layer-specific uniforms, and do the low-level calls to render
 		//    whatever geometries are needed.
-		glRender: function(program) {
+		glRender: function(program, programName) {
 			var gl = this._map.getGlContext();
 			var buffers = this._getGlBuffers();
 
 			gl.uniform1f(program.uniforms.uTileZoom, this._tileZoom);
+			gl.uniform1f(program.uniforms.uNow, performance.now());
 
 			L.GlUtil.bindBufferToAttrib(gl,
 				buffers.vertices, program.attributes.aCRSCoords, 3, gl.FLOAT);
