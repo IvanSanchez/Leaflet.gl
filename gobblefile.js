@@ -1,7 +1,7 @@
 // gobblefile.js
 var gobble = require('gobble');
 
-// Roughly equal to gobble([GLSL→JS, nativeJS]).browserify(...)
+// Roughly equal to gobble([GLSL→JS, nativeJS]).include(...)
 var concatenatedJs = gobble([
 	gobble('shaders').transform('gl2js', {
 		format: 'string'
@@ -12,15 +12,24 @@ var concatenatedJs = gobble([
 }).transform('concat',{
 	dest: 'Leaflet.gl.js',
 	files: [
-		'core/Browser.js',
-		'core/GlUtil.js',
-		'Map.js',
-		'layer/tile/TileLayer.js'
+	'COPYING',
+	'core/Browser.js',
+	'core/GlUtil.js',
+	'Map.js',
+	'layer/tile/TileLayer.js'
 	]
-});
+});;
 
-module.exports = gobble([
+
+var uglifiedJs = gobble([
 	concatenatedJs,
 	concatenatedJs.transform('uglifyjs', { ext: '.min.js' })
+]);
+
+module.exports = gobble([
+	gobble([uglifiedJs, 'COPYING'])
+		.transform('concat', {dest:'Leaflet.gl.js', files: ['COPYING', 'Leaflet.gl.js']}),
+	gobble([uglifiedJs, 'COPYING'])
+		.transform('concat', {dest:'Leaflet.gl.min.js', files: ['COPYING', 'Leaflet.gl.min.js']})
 ]);
 

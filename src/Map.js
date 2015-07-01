@@ -1,3 +1,9 @@
+// L.Map is responsible for:
+//  * Creating the destination canvas and WebGL rendering context
+//  * Keeping track of the main WebGL rendering loop, including animations
+//  * Exposing an interface for layers so they can hook up to the map's WebGL
+//      context, programs, and rendering loop.
+
 
 if (L.Browser.gl) { (function(){
 

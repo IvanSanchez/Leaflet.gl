@@ -1,3 +1,6 @@
+// L.TileLayer modifies the behaviour of all tilelayers to use WebGL
+//   to render themselves.
+
 if (L.Browser.gl) { (function(){
 
 	var tileLayerProto = L.extend({}, L.TileLayer.prototype);
