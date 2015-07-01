@@ -1,8 +1,9 @@
 
 if (L.Browser.gl) { (function(){
 
+	// Keep a copy of the L.Map prototype before the include() call, so the
+	//   previous methods can be called before overwriting them.
 	var mapProto = L.extend({}, L.Map.prototype);
-
 
 	L.Map.include(!L.Browser.gl ? {} : {
 

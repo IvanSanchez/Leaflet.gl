@@ -56,12 +56,35 @@ if (L.Browser.gl) { (function(){
 			tile = this._tiles[key];
 			if (!tile) { return; }
 
-			// Store a few things needed to later create the GL buffers.
-			tile.loaded = +new Date();
-			tile.crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
-			tile.texture = L.GlUtil.initTexture(this._map._gl, tile.el);
+			// Pack data from this tile into a low-level array, which will
+			//   later form an interleaved array buffer.
+			// A tile is two triangles in a triangle strip, defined by 4 vertices.
+			// Each vertex has 3 coordinates, two texture coordinates, one age.
+			tile.glData = new Float32Array(24);
 			tile.age = performance.now();
-			tile.tileZoom
+
+			var crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
+			var tileZoom = tile.coords.z;
+
+			tile.glData.set([
+				crsCoords.min.x, crsCoords.min.y, tileZoom,
+				0, 1,
+				tile.age,
+
+				crsCoords.max.x, crsCoords.min.y, tileZoom,
+				1, 1,
+				tile.age,
+
+				crsCoords.min.x, crsCoords.max.y, tileZoom,
+				0, 0,
+				tile.age,
+
+				crsCoords.max.x, crsCoords.max.y, tileZoom,
+				1, 0,
+				tile.age
+			]);
+
+			tile.texture = L.GlUtil.initTexture(this._map.getGlContext(), tile.el);
 
 			this.fire('tileload', {
 				tile: tile.el,
@@ -114,13 +137,14 @@ if (L.Browser.gl) { (function(){
 		},
 
 		_invalidateGlVertexBuffer: function(){
+			this.map.getGlContext().destroyBuffer(this._glVertexBuffer);
 			this._glVertexBuffer = null;
 		},
 
 
 		// Cache buffers with data needed to render the tiles.
-		// This includes the vertices array, textures, and all
-		//   per-vertex attributes needed.
+		// This includes an interleaved vertices&attributes array,
+		//   and the texture array
 		_getGlBuffers: function(){
 
 			if (this._glBuffers) {
@@ -129,58 +153,26 @@ if (L.Browser.gl) { (function(){
 
 			var length = Object.keys(this._tiles).length;
 			var gl = this._map.getGlContext();
-// 			console.log(length, this._tiles);
 
 			// Each tile is represented by 2 triangles in a triangle strip
 			//   = 6 coordinate pairs = 12 floats.
-			var vertices      = new Float32Array(length * 12);
-			var textureCoords = new Float32Array(length * 8);
-			var tileAge       = new Float32Array(length * 4);
-			var i = 0;
+			var bytesPerTile = 24;
+			var vertices = new Float32Array(length * bytesPerTile);
+			var i = 0;	// Count of tiles actually loaded
 			var textures = [];
 
 			for (var key in this._tiles) {
 				var tile = this._tiles[key];
-				if (tile.loaded) {
-
-					var coords = tile.crsCoords;
-					var tileZoom = tile.coords.z;
-					vertices.set([
-						coords.min.x, coords.min.y, tileZoom,
-						coords.max.x, coords.min.y, tileZoom,
-// 						coords.max.x, coords.max.y, tileZoom,
-						coords.min.x, coords.max.y, tileZoom,
-						coords.max.x, coords.max.y, tileZoom,
-// 						coords.min.x, coords.min.y, tileZoom
-					], i * 12);	// Insert at index (tile count * 12)
-
-					// All textures cover the entire geometry
-					textureCoords.set([
-						0, 1,
-						1, 1,
-						0, 0,
-						1, 0,
-					], i * 8);
-
-					tileAge.set([
-						tile.age,
-						tile.age,
-						tile.age,
-						tile.age
-					], i * 4);
-
-					textures[i] = this._tiles[key].texture;
+				if (tile.age) {
+					vertices.set(tile.glData, i * bytesPerTile);
+					textures[i] = tile.texture;
 					i ++;	// Tile count
 				}
 			}
 
-// 			console.log('New tilelayer vertices: ', vertices, i);
-
 			return {
 				vertices: L.GlUtil.initBuffer(gl, vertices, gl.DYNAMIC_DRAW),
-				textureCoords: L.GlUtil.initBuffer(gl, textureCoords, gl.DYNAMIC_DRAW),
 				textures: textures,
-				tileAge: L.GlUtil.initBuffer(gl, tileAge, gl.DYNAMIC_DRAW),
 				length: i	// tile count
 			};
 		},
@@ -198,12 +190,17 @@ if (L.Browser.gl) { (function(){
 			gl.uniform1f(program.uniforms.uTileZoom, this._tileZoom);
 			gl.uniform1f(program.uniforms.uNow, performance.now());
 
-			L.GlUtil.bindBufferToAttrib(gl,
-				buffers.vertices, program.attributes.aCRSCoords, 3, gl.FLOAT);
-			L.GlUtil.bindBufferToAttrib(gl,
-				buffers.textureCoords, program.attributes.aTextureCoords, 2, gl.FLOAT);
-			L.GlUtil.bindBufferToAttrib(gl,
-				buffers.tileAge, program.attributes.aAge, 1, gl.FLOAT);
+			// Bind the interleaved vertices&attributes buffer to three different
+			//   attributes.
+			// Each tile is 12 floats = 24 bytes:
+			//   Vertices start at 0
+			//   Texture coords start after 3 floats = 12 bytes
+			//   Tile age starts after 5 floats = 20 bytes
+			var attribs = program.attributes;
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertices);
+			gl.vertexAttribPointer(attribs.aCRSCoords,     3, gl.FLOAT, false, 24, 0);
+			gl.vertexAttribPointer(attribs.aTextureCoords, 2, gl.FLOAT, false, 24, 12);
+			gl.vertexAttribPointer(attribs.aAge,           1, gl.FLOAT, false, 24, 20);
 
 			// Render tiles one by one. Bit inefficient, but simpler at
 			//   this stage in development.
