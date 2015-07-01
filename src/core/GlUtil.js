@@ -88,18 +88,6 @@ L.GlUtil = !L.Browser.gl ? {} : {
 		// attrib index, size, type, normalized (into [-1,1] or [0,1]),
 		// stride (when skiping items), pointer (when start at non-zero)
 		glContext.vertexAttribPointer(attrib, size, type, false, 0, 0);
-	},
-
-	// One-dimensional cubic bezier interpolation. T must be between [0,1].
-	// WebGL doesn't have any helpers for interpolation (as CSS transitions do),
-	//   so transitions have to be interpolated at every frame.
-	// https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Cubic_B.C3.A9zier_curves
-	cubicBezierInterpolation: function(t, p0, p1, p2, p3) {
-		var s = 1-t;
-		return   s*s*s*p0 +
-		       3*s*s*t*p1 +
-		       3*s*t*t*p2 +
-		         t*t*t*p3;
 	}
 
 };

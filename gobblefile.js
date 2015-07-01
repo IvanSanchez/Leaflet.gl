@@ -14,12 +14,12 @@ var concatenatedJs = gobble([
 	files: [
 	'COPYING',
 	'core/Browser.js',
+	'core/Util.js',
 	'core/GlUtil.js',
 	'Map.js',
 	'layer/tile/TileLayer.js'
 	]
-});;
-
+});
 
 var uglifiedJs = gobble([
 	concatenatedJs,

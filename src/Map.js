@@ -159,6 +159,7 @@ if (L.Browser.gl) { (function(){
 		},
 
 
+		// In milliseconds
 		_glZoomAnimationDuration: 250,
 
 		// Capture start/end center/halfsize when starting a zoom animation
@@ -175,8 +176,12 @@ if (L.Browser.gl) { (function(){
 			this._glZoomAnimation = {
 				start: {center: startCenter, halfSize: startHalfSize },
 				end:   {center: endCenter,   halfSize: endHalfSize },
-				until: performance.now() + this._glZoomAnimationDuration
+				until: performance.now() + this._glZoomAnimationDuration,
+				bezier: L.util.unitBezier(0, 0, 0.25, 1),
+				scale: this.getZoomScale(this._animateToZoom, this._zoom)
 			}
+
+// 			console.log('Starting new zoom animation: ', this._glZoomAnimation);
 
 			this.glRenderUntil(this._glZoomAnimationDuration);
 		},
@@ -197,22 +202,25 @@ if (L.Browser.gl) { (function(){
 			if (this._glZoomAnimation) {
 				var anim = this._glZoomAnimation;
 
-				// From 0 (animation started) to 1 (animation ended)
-				var t = 1 - ((anim.until - performance.now()) / this._glZoomAnimationDuration);
+				// From 0 (animation started) to 1 (animation ended). Clamp at 1,
+				// as a couple of frames might run after the zoom animation has ended.
+				var t = Math.min(1 - ((anim.until - performance.now()) / this._glZoomAnimationDuration), 1);
 
-				// Map [0,1] to the bezier curve value and clamp to a max of 1, as
-				//   the animation might run for one frame after it's needed.
-				// This should really be a Bezier curve, but as the implementation is
-				//   completely buggy (see #2), let's fake it with an reverse parabola
-				//   for the time being.
-	// 			t = Math.min(L.GlUtil.cubicBezierInterpolation(t, 0, 0, 0.25, 1), 1);
-	// 			t = Math.min(t, 1);
-				t = Math.min(t, 1); t = 1 - (1-t) * (1-t);
-				var s = 1-t;
+				// Map [0,1] to [0,1] in the bezier curve
+				var bezierValue = anim.bezier.solve(t);
+
+				// Map [0,1] to [1,anim.scale]
+				var scale = 1 + bezierValue * ( anim.scale - 1);
 
 				// Interpolate center and halfsize
-				center   = anim.end.center.multiplyBy(t).add(anim.start.center.multiplyBy(s));
-				halfSize = anim.end.halfSize.multiplyBy(t).add(anim.start.halfSize.multiplyBy(s));
+				//// FIXME: calculations for halfSize work, but for center do not. Zooming
+				////   is only smooth when keeping the center static.
+				//// FIXME: WebGL starts the animation about three frames sooner than CSS.
+				////   This causes a noticeable lag with 250msec animations Maybe trigger
+				////   a new event when the zoom animation code has applied the CSS style,
+				////   and start the animation there instead???.
+				center = anim.start.center.add( anim.end.center.subtract(anim.start.center).multiplyBy(bezierValue) );
+				halfSize = anim.start.halfSize.divideBy(scale);
 
 			} else {	// Default, no animation whatsoever
 				center = this.options.crs.project(this.getCenter());
