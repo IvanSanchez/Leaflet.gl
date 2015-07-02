@@ -128,10 +128,11 @@ if (L.Browser.gl) { (function(){
 			if (!tile) { return; }
 
 // 			console.log('remove ', key, performance.now());
-
-			this._map.getGlContext().deleteTexture(tile.texture);
-
-			delete this._tiles[key];
+			window.setTimeout(function(){
+				// Wait a bit until other tiles have faded in
+				this._map.getGlContext().deleteTexture(tile.texture);
+				delete this._tiles[key];
+			}.bind(this), 500);
 
 			this.fire('tileunload', {
 				tile: tile.el,
