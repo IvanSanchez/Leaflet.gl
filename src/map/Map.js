@@ -5,13 +5,17 @@
 //      context, programs, and rendering loop.
 
 
-if (L.Browser.gl) { (function(){
+(function(){
 
 	// Keep a copy of the L.Map prototype before the include() call, so the
 	//   previous methods can be called before overwriting them.
 	var mapProto = L.extend({}, L.Map.prototype);
 
-	L.Map.include(!L.Browser.gl ? {} : {
+// 		L.Map.addInitHook(function() {
+// 			this.on('move moveend', this.glRenderOnce, this);
+// 		});
+
+	L.Map.include({
 
 		_initLayout: function() {
 
@@ -28,7 +32,7 @@ if (L.Browser.gl) { (function(){
 
 			this._glPrograms = [];
 			this._glLayers = {};
-
+			this._glView = {};	// Center and half-size of the current view. Might change every frame.
 
 			gl.viewportWidth  = this._glCanvas.width;
 			gl.viewportHeight = this._glCanvas.height;
@@ -48,11 +52,6 @@ if (L.Browser.gl) { (function(){
 			// Depth buffer is needed for rendering things on top of other things with
 			//   an explicit order
 			gl.enable(gl.DEPTH_TEST);
-
-
-			this.on('move moveend', this.glRenderOnce, this);
-			this.on('zoomanim', this._onGlZoomAnimationStart, this);
-			this.on('zoomend', this._onGlZoomAnimationEnd, this);
 
 		},
 
@@ -159,143 +158,6 @@ if (L.Browser.gl) { (function(){
 		},
 
 
-		// In milliseconds
-		_glZoomAnimationDuration: 250,
-
-
-		// Capture start/end center/halfsize when starting a zoom animation
-		//   (triggered by 'zoomanim')
-		// Could also be added to Map.ZoomAnimation._animateZoom
-		_onGlZoomAnimationStart: function(ev) {
-			var startCenter = this.options.crs.project(this.getCenter());
-			var startCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
-			var startHalfSize = startCorner.subtract(startCenter);
-//
-			var endCenter   = this.options.crs.project(this._animateToCenter);
-			var endHalfSize = startHalfSize.divideBy(this.getZoomScale(this._animateToZoom, this._zoom));
-
-			// Given the start and end center and halfsizes, infer
-			//   which CRS coordinate will stay fixed in the screen
-			//   during the animation
-
-			// The proportion between the fixed point to the center and to the corner
-			//   stays constant between the start and end center-sizes, so
-			//   the fixed point f solves: (x-c1) / (c1+s1-x) = (x-c2) / (c2+s2-x)
-			// where c1,c2 are start/end center and s1/s1 are start/end half sizes
-			// https://www.wolframalpha.com/input/?i=%28x-c1%29+%2F+%28c1%2Bs1-x%29+%3D+%28x-c2%29+%2F+%28c2%2Bs2-x%29+for+x
-
-			// x = (c2*s1-c1*s2)/(s1-s2) and s1!=s2 and s1*s2*(c1-c2+s1-s2)!=0
-
-			var c1x = startCenter.x;
-			var c1y = startCenter.y;
-			var c2x = endCenter.x;
-			var c2y = endCenter.y;
-			var s1x = startHalfSize.x;
-			var s1y = startHalfSize.y;
-			var s2x = endHalfSize.x;
-			var s2y = endHalfSize.y;
-
-			var fixedX = (c2x*s1x - c1x*s2x) / (s1x - s2x);
-			var fixedY = (c2y*s1y - c1y*s2y) / (s1y - s2y);
-
-			var fixedCRSCoords = new L.Point(fixedX, fixedY);
-
-			// Infer the (current) screen coordinate of the fixed CRS coords
-
-			var fixedContainerCoords = this.latLngToContainerPoint(this.options.crs.unproject( fixedCRSCoords ));
-
-// 			console.log('zoom start', ev);
-// 			console.log('inferred fixed CRS coords:', fixedCRSCoords);
-// 			console.log('inferred fixed Container coords:', fixedContainerCoords);
-
-			var size = this.getSize();
-			var relativeContainerPoint = new L.Point(fixedContainerCoords.x / size.x, fixedContainerCoords.y / size.y).subtract(new L.Point(0.5, 0.5)).multiplyBy(2);
-
-			// The animation won't be started instantly. Instead, look for changes on
-			//   the zoomproxy pane's CSS for transformations and start
-			//   the animation on the first change. So, the initial state of the
-			//   zoomproxy CSS transform has to be stored.
-			var transformCSS = this._container.querySelector('.leaflet-proxy.leaflet-zoom-animated').style.transform;
-
-			this._glZoomAnimation = {
-				startHalfSize: startHalfSize,
-				fixedCRSCoords: fixedCRSCoords,
-				relativeContainerPoint: relativeContainerPoint,
-				until: -1,	// Animation won't be started until there's a change in the zoom proxy div
-				bezier: L.util.unitBezier(0, 0, 0.25, 1),
-				transformCSS: transformCSS,
-				scale: this.getZoomScale(this._animateToZoom, this._zoom)
-			};
-
-			this.glRenderUntil(this._glZoomAnimationDuration);
-		},
-
-
-		// Cancels a zoom animation (triggered on 'zoomend' when the animation is over)
-		// Could also be added to Map.ZoomAnimation._onZoomTransitionEnd
-		_onGlZoomAnimationEnd: function(ev) {
-			this._glZoomAnimation = null;
-		},
-
-
-		// Returns the maps' center and half size, in CRS units,
-		//   taking animations into account.
-		// TODO: Consider having the GL viewport as a map property, expose a
-		//   'glPreRender' event, have the different animations do checks and
-		//   change the viewport on that event.
-		_glGetViewport: function() {
-			var center = null;
-			var halfSize = null;
-
-			// Check whether the zoom animation actually started
-			if (this._glZoomAnimation && this._glZoomAnimation.until === -1) {
-// 				console.log(this._glZoomAnimation);
-				var transformCSS = this._container.querySelector('.leaflet-proxy.leaflet-zoom-animated').style.transform;
-// 				console.log(this._glZoomAnimation, transformCSS);
-				if (transformCSS !== this._glZoomAnimation.transformCSS) {
-					this._glZoomAnimation.until = performance.now() + this._glZoomAnimationDuration;
-// 					console.log('Zoom animation started until', this._glZoomAnimation.until);
-					this.glRenderUntil(this._glZoomAnimationDuration);
-				} else {
-// 					console.log('Zoom animation delayed');
-				}
-			}
-
-			if (this._glZoomAnimation && this._glZoomAnimation.until !== -1) {
-				var anim = this._glZoomAnimation;
-
-				// From 0 (animation started) to 1 (animation ended). Clamp at 1,
-				// as a couple of frames might run after the zoom animation has ended.
-				var t = Math.min(1 - ((anim.until - performance.now()) / this._glZoomAnimationDuration), 1);
-
-				// Map [0,1] to [0,1] in the bezier curve
-				var bezierValue = anim.bezier.solve(t);
-
-				// Map [0,1] to [1,anim.scale]
-				var scale = 1 + bezierValue * ( anim.scale - 1);
-
-				// Interpolate halfsize, infer center from the fixed point position.
-				halfSize = anim.startHalfSize.divideBy(scale);
-
-				var offset = new L.Point(
-					halfSize.x * anim.relativeContainerPoint.x,
-					halfSize.y * anim.relativeContainerPoint.y  );
-
-				center = anim.fixedCRSCoords.subtract( offset );
-
-			} else {	// Default, no animation whatsoever
-				center = this.options.crs.project(this.getCenter());
-				var corner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
-				halfSize = corner.subtract(center);
-			}
-
-			return {
-				center: center,
-				halfSize: halfSize
-			}
-		},
-
-
 		// Renders one frame by setting the viewport uniforms and letting layers
 		//   render themselves.
 		// Also controls the main render loop, requesting the next animFrame or stopping
@@ -310,7 +172,6 @@ if (L.Browser.gl) { (function(){
 				this.fire('glRenderEnd', {now: performance.now()});
 			}
 
-
 			var gl = this._gl;
 
 			// Render the scene in several phases, switching shader programs
@@ -324,7 +185,7 @@ if (L.Browser.gl) { (function(){
 			//   render. Otherwise it's a waste of resources to enable the
 			//   shaders for that phase.
 
-			var size = this.getSize();
+// 			var size = this.getSize();
 	// 		gl.drawingBufferWidth  = size.x;
 	// 		gl.drawingBufferHeight = size.y;
 			gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -332,12 +193,11 @@ if (L.Browser.gl) { (function(){
 	// 		gl.viewport(0, 0, size.x, size.y);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-			var projectedCenter = this.options.crs.project(this.getCenter());
-			var projectedCorner = this.options.crs.project(this.containerPointToLatLng(this.getSize()));
-			var halfSize = projectedCorner.subtract(projectedCenter);	// In CRS units
-
 			// Fetch center, half size in CRS units
-			var viewport = this._glGetViewport();
+			// These bits of data are set on a per-frame basis by the animations code,
+			//   by listening to the 'glPrepareFrame' event.
+			this.fire('glPrepareFrame');
+			var view = this._glView;
 
 			var i;
 			// The programs array comes pre-sorted from registerGlProgram().
@@ -349,8 +209,8 @@ if (L.Browser.gl) { (function(){
 					gl.useProgram(program);
 
 					// Push crs2clipspace uniforms
-					gl.uniform2f(program.uniforms.uCenter, viewport.center.x, viewport.center.y);
-					gl.uniform2f(program.uniforms.uHalfViewportSize, viewport.halfSize.x, viewport.halfSize.y);
+					gl.uniform2f(program.uniforms.uCenter, view.center.x, view.center.y);
+					gl.uniform2f(program.uniforms.uHalfViewportSize, view.halfSize.x, view.halfSize.y);
 
 					// Let each layer render itself using the program they need.
 					// The layer will rebind vertex attrib arrays and uniforms as needed
@@ -364,10 +224,10 @@ if (L.Browser.gl) { (function(){
 			var end = performance.now();
 			var frameTime = end - now;
 			var fps = 1000 / (end - this._glLastFrameTimestamp);
-			this.fire('glRender', {now: end, frameTime: frameTime, fps: fps});
+			this.fire('glRenderFrame', {now: end, frameTime: frameTime, fps: fps});
 			this._glLastFrameTimestamp = end;
 		}
 	});
 
 
-})(); }
+})();

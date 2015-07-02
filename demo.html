@@ -54,10 +54,10 @@
 			document.getElementById('fps').style.borderColor = 'grey';
 // 			console.log('GL render end');
 		});
-		map.on('glRender', function(ev){
+		map.on('glRenderFrame', function(ev){
 // 			console.log('GL render frame');
 		});
-		map.on('glRender glRenderStart glRenderEnd', function(ev){
+		map.on('glRenderFrame glRenderStart glRenderEnd', function(ev){
 			document.getElementById('fps').innerHTML = L.Util.formatNum(ev.fps,2) + ' FPS';
 		});
 

@@ -5,4 +5,5 @@ node_modules
 dist/*
 Leaflet-1.0-dev/*
 *~
+npm-debug.log
 

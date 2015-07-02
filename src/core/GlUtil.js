@@ -1,6 +1,6 @@
 // L.GlUtil contains shorthands for common WebGL operations
 
-L.GlUtil = !L.Browser.gl ? {} : {
+L.GlUtil = {
 
 	createProgram: function(glContext, vertexShaderCode, fragmentShaderCode, attributeNames, uniformNames) {
 

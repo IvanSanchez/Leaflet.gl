@@ -7,18 +7,11 @@ var concatenatedJs = gobble([
 		format: 'string'
 	}),
 	gobble('src')
-]).transform('include', {
+]).transform('include', {	// The first pass includes GLSL into JS
 	sourceMap: false
-}).transform('concat',{
-	dest: 'Leaflet.gl.js',
-	files: [
-	'COPYING',
-	'core/Browser.js',
-	'core/Util.js',
-	'core/GlUtil.js',
-	'Map.js',
-	'layer/tile/TileLayer.js'
-	]
+}).transform('include',{	// The second pass includes everything into Leaflet.gl.js
+	delimiters: [ '#include <', '>' ],
+	sourceMap: false
 });
 
 var uglifiedJs = gobble([
