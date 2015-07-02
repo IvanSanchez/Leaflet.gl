@@ -363,8 +363,9 @@ if (L.Browser.gl) { (function(){
 			// A bit of accounting will come in handy for debugging.
 			var end = performance.now();
 			var frameTime = end - now;
-			var fps = 1000 / frameTime;
+			var fps = 1000 / (end - this._glLastFrameTimestamp);
 			this.fire('glRender', {now: end, frameTime: frameTime, fps: fps});
+			this._glLastFrameTimestamp = end;
 		}
 	});
 
