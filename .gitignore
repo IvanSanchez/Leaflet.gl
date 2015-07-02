@@ -2,8 +2,6 @@ node_modules
 .gobble-build/
 .gobble-watch/
 .gobble/
-dist/*
-Leaflet-1.0-dev/*
 *~
 npm-debug.log
 
