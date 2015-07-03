@@ -6,7 +6,7 @@ Leaflet.gl provides a WebGL canvas, context and utilities for leaflet layers to 
 
 There are no huge performance improvements as of now. The only real benefit of Leaflet.gl is getting rid of the Leaflet/Leaflet#3575 bug.
 
-Basic functionality works. Leaflet.gl hasn't been tested with other plugins or CRS definitions. Things should work without any hitches, but might not.
+Basic functionality works. Leaflet.gl hasn't been tested with other plugins, CRS definitions, non-square tiles, and other non-trivial stuff. Things should work without any hitches, but might not.
 
 ## Demo
 

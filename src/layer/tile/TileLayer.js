@@ -141,7 +141,7 @@
 		},
 
 		_invalidateGlVertexBuffer: function(){
-			this.map.getGlContext().destroyBuffer(this._glVertexBuffer);
+			this._map.getGlContext().destroyBuffer(this._glVertexBuffer);
 			this._glVertexBuffer = null;
 		},
 

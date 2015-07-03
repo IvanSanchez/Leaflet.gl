@@ -204,8 +204,8 @@
 
 					// Let each layer render itself using the program they need.
 					// The layer will rebind vertex attrib arrays and uniforms as needed
-					for (i in this._glLayers.tile) {
-						this._glLayers.tile[i].glRender(program);
+					for (i in this._glLayers[programName]) {
+						this._glLayers[programName][i].glRender(program);
 					}
 				}
 			}

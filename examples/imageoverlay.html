@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang='en'>
+<meta charset="utf-8">
+<head>
+	<title>Leaflet GL demo</title>
+
+	<link rel="stylesheet" href="../Leaflet-1.0-dev/leaflet.css" />
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 	<script type="text/javascript" src="Leaflet-1.0-dev/leaflet.js"></script> -->
+	<script type="text/javascript" src="../Leaflet-1.0-dev/leaflet-src.js"></script>
+
+	<script src="../dist/Leaflet.gl.js"></script>
+</head>
+<body>
+
+	<h1>LeafletGL ImageOverlay demo</h1>
+
+	<p>Image overlays are rendered in WebGL also</p>
+
+	<div id="map" style='width:800px; height:600px;'></div>
+	<div>FPS:<span id="fps" style='border: gray 2px solid;'></span></div>
+	
+	<script type="text/javascript">
+
+		var bbox = L.latLngBounds(L.latLng(40, -10), L.latLng(50, 50));
+
+		var img = L.imageOverlay('logo.png', bbox)
+
+		var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			osm = L.tileLayer(osmUrl, {maxZoom: 18, attribution: osmAttrib});
+
+		var map = L.map('map')
+				.setView([0, 0], 0)
+// 				.addLayer(osm)
+				.addLayer(img)
+				;
+
+
+		map.on('glRenderStart', function(ev){
+			document.getElementById('fps').style.borderColor = 'red';
+// 			console.log('GL render start');
+		});
+		map.on('glRenderEnd', function(ev){
+			document.getElementById('fps').style.borderColor = 'grey';
+// 			console.log('GL render end');
+		});
+		map.on('glRenderFrame', function(ev){
+// 			console.log('GL render frame');
+		});
+		map.on('glRenderFrame glRenderStart glRenderEnd', function(ev){
+			document.getElementById('fps').innerHTML = L.Util.formatNum(ev.fps,2) + ' FPS';
+		});
+
+	</script>
+</body>
+</html>

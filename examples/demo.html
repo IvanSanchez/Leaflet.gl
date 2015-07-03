@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang='en'>
+<meta charset="utf-8">
+<head>
+	<title>Leaflet GL demo</title>
+
+	<link rel="stylesheet" href="../Leaflet-1.0-dev/leaflet.css" />
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 	<script type="text/javascript" src="Leaflet-1.0-dev/leaflet.js"></script> -->
+	<script type="text/javascript" src="../Leaflet-1.0-dev/leaflet-src.js"></script>
+
+	<script src="../dist/Leaflet.gl.js"></script>
+</head>
+<body>
+
+	<h1>Basic LeafletGL demo</h1>
+
+	<p>Just one tilelayer and a few markers</p>
+
+	<div id="map" style='width:800px; height:600px;'></div>
+	<div>FPS:<span id="fps" style='border: gray 2px solid;'></span></div>
+	
+	<script type="text/javascript">
+
+		var kyiv = [50.5, 30.5],
+			lnd  = [51.51, -0.12],
+			sf   = [37.77, -122.42],
+			dc   = [38.91, -77.04],
+			trd  = [63.41, 10.41];
+
+
+		var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			osm = L.tileLayer(osmUrl, {maxZoom: 18, attribution: osmAttrib});
+
+		var map = L.map('map')
+				.setView([0, 0], 0)
+				.addLayer(osm);
+
+
+		var marker1 = L.marker(kyiv).addTo(map),
+			marker2 = L.marker(lnd).addTo(map);
+			marker3 = L.marker(dc).addTo(map),
+			marker4 = L.marker(sf).addTo(map),
+			marker5 = L.marker(trd).addTo(map);
+
+
+		map.on('glRenderStart', function(ev){
+			document.getElementById('fps').style.borderColor = 'red';
+// 			console.log('GL render start');
+		});
+		map.on('glRenderEnd', function(ev){
+			document.getElementById('fps').style.borderColor = 'grey';
+// 			console.log('GL render end');
+		});
+		map.on('glRenderFrame', function(ev){
+// 			console.log('GL render frame');
+		});
+		map.on('glRenderFrame glRenderStart glRenderEnd', function(ev){
+			document.getElementById('fps').innerHTML = L.Util.formatNum(ev.fps,2) + ' FPS';
+		});
+
+	</script>
+</body>
+</html>
