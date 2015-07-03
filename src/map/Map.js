@@ -23,10 +23,6 @@
 
 			var size = this.getSize();
 			this._glCanvas = L.DomUtil.create('canvas', 'leaflet-webgl', this._container);
-			this._glCanvas.style.width  = size.x + 'px';
-			this._glCanvas.style.height = size.y + 'px';
-			this._glCanvas.width  = size.x;
-			this._glCanvas.height = size.y;
 			var gl = this._gl = this._glCanvas.getContext(L.Browser.gl, {premultipliedAlpha:false});
 
 
@@ -34,8 +30,7 @@
 			this._glLayers = {};
 			this._glView = {};	// Center and half-size of the current view. Might change every frame.
 
-			gl.viewportWidth  = this._glCanvas.width;
-			gl.viewportHeight = this._glCanvas.height;
+			this._glResizeCanvas();
 
 
 			// When clearing the canvas, set pixels to grey transparent
@@ -185,12 +180,7 @@
 			//   render. Otherwise it's a waste of resources to enable the
 			//   shaders for that phase.
 
-// 			var size = this.getSize();
-	// 		gl.drawingBufferWidth  = size.x;
-	// 		gl.drawingBufferHeight = size.y;
 			gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-	// 		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-	// 		gl.viewport(0, 0, size.x, size.y);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 			// Fetch center, half size in CRS units
@@ -228,10 +218,14 @@
 			this._glLastFrameTimestamp = end;
 		},
 
-		
+
 		invalidateSize: function(options) {
 			mapProto.invalidateSize.call(this, options);
+			this._glResizeCanvas();
+			this.glRenderOnce();
+		},
 
+		_glResizeCanvas: function() {
 			var size = this.getSize();
 			this._glCanvas.style.width  = size.x + 'px';
 			this._glCanvas.style.height = size.y + 'px';
@@ -239,7 +233,6 @@
 			this._glCanvas.height = size.y;
 			this._gl.viewportWidth  = this._glCanvas.width;
 			this._gl.viewportHeight = this._glCanvas.height;
-			this.glRenderOnce();
 		}
 
 

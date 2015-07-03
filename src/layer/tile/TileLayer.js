@@ -148,7 +148,8 @@
 
 		// Cache buffers with data needed to render the tiles.
 		// This includes an interleaved vertices&attributes array,
-		//   and the texture array
+		//   and the texture array.
+		// This is what OpenLayers3 calls "batches" or "replays".
 		_getGlBuffers: function(){
 
 			if (this._glBuffers) {
