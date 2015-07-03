@@ -88,7 +88,8 @@ L.GlUtil = {
 		// attrib index, size, type, normalized (into [-1,1] or [0,1]),
 		// stride (when skiping items), pointer (when start at non-zero)
 		glContext.vertexAttribPointer(attrib, size, type, false, 0, 0);
-	}
+	},
 
 };
 
+L.glUtil = {};

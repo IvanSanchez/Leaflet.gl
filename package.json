@@ -27,6 +27,7 @@
   },
   "scripts": {
     "postinstall": "node_modules/gobble-cli/lib/index.js build -f dist",
+    "prepublish": "node_modules/gobble-cli/lib/index.js build -f dist",
     "watch": "node_modules/gobble-cli/lib/index.js watch -f dist"
   }
 }

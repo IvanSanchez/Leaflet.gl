@@ -228,8 +228,7 @@
 			this._glLastFrameTimestamp = end;
 		},
 
-
-
+		
 		invalidateSize: function(options) {
 			mapProto.invalidateSize.call(this, options);
 

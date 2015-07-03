@@ -80,12 +80,12 @@
 
 			this._glZoomAnimation = {
 				startHalfSize: startHalfSize,
-			   fixedCRSCoords: fixedCRSCoords,
-			   relativeContainerPoint: relativeContainerPoint,
-			   until: -1,	// Animation won't be started until there's a change in the zoom proxy div
-			   bezier: L.util.unitBezier(0, 0, 0.25, 1),
-				  transformCSS: transformCSS,
-			   scale: this.getZoomScale(this._animateToZoom, this._zoom)
+				fixedCRSCoords: fixedCRSCoords,
+				relativeContainerPoint: relativeContainerPoint,
+				until: -1,	// Animation won't be started until there's a change in the zoom proxy div
+				bezier: L.glUtil.unitBezier(0, 0, 0.25, 1),
+				transformCSS: transformCSS,
+				scale: this.getZoomScale(this._animateToZoom, this._zoom)
 			};
 
 			this.on('glPrepareFrame', this._onGlZoomAnimationFrame);

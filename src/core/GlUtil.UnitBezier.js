@@ -27,7 +27,7 @@
 * http://svn.webkit.org/repository/webkit/trunk/Source/WebCore/platform/graphics/UnitBezier.h
 */
 
-L.Util.UnitBezier = function (p1x, p1y, p2x, p2y) {
+L.GlUtil.UnitBezier = function (p1x, p1y, p2x, p2y) {
 	// Calculate the polynomial coefficients, implicit first and last control points are (0,0) and (1,1).
 	this.cx = 3.0 * p1x;
 	this.bx = 3.0 * (p2x - p1x) - this.cx;
@@ -43,7 +43,7 @@ L.Util.UnitBezier = function (p1x, p1y, p2x, p2y) {
 	this.p2y = p2y;
 };
 
-L.Util.UnitBezier.prototype = {
+L.GlUtil.UnitBezier.prototype = {
 
 	sampleCurveX: function(t) {
 		// `ax t^3 + bx t^2 + cx t' expanded using Horner's rule.
@@ -106,8 +106,6 @@ L.Util.UnitBezier.prototype = {
 	}
 };
 
-if (!L.util) { L.util = {}; }
-
-L.util.unitBezier = function(p1x, p1y, p2x, p2y) {
-	return new L.Util.UnitBezier(p1x, p1y, p2x, p2y);
-}
+L.glUtil.unitBezier = function(p1x, p1y, p2x, p2y) {
+	return new L.GlUtil.UnitBezier(p1x, p1y, p2x, p2y);
+};
