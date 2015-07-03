@@ -91,7 +91,7 @@
 		glRender: function(program, programName) {
 			var gl = this._map.getGlContext();
 
-			var opacity = this.options.opacity * (performance.now() - this._age) / 200;
+			var opacity = this.options.opacity * Math.min((performance.now() - this._age) / 200, 1);
 
 			gl.uniform1f(program.uniforms.uOpacity, opacity);
 

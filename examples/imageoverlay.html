@@ -26,7 +26,7 @@
 
 		var bbox = L.latLngBounds(L.latLng(40, -10), L.latLng(50, 50));
 
-		var img = L.imageOverlay('logo.png', bbox)
+		var img = L.imageOverlay('logo.png', bbox, {opacity: 0.8});
 
 		var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -34,7 +34,7 @@
 
 		var map = L.map('map')
 				.setView([0, 0], 0)
-// 				.addLayer(osm)
+				.addLayer(osm)
 				.addLayer(img)
 				;
 
