@@ -24,9 +24,9 @@
 			var size = this.getSize();
 			this._glCanvas = L.DomUtil.create('canvas', 'leaflet-webgl', this._container);
 			this._glCanvas.style.width  = size.x + 'px';
-			this._glCanvas.style.height = size.y + 'px';	/// TODO: Resize handler
+			this._glCanvas.style.height = size.y + 'px';
 			this._glCanvas.width  = size.x;
-			this._glCanvas.height = size.y;	/// TODO: Resize handler
+			this._glCanvas.height = size.y;
 			var gl = this._gl = this._glCanvas.getContext(L.Browser.gl, {premultipliedAlpha:false});
 
 
@@ -136,7 +136,7 @@
 			if (!this._glEndTime) {
 				this.fire('glRenderStart', {now: performance.now()});
 				this._glEndTime = performance.now() + milliseconds;
-				this._glRender();
+				L.Util.requestAnimFrame(this._glRender, this);
 			} else {
 				this._glEndTime = Math.max(
 					performance.now() + milliseconds,
@@ -152,7 +152,7 @@
 		glRenderOnce: function() {
 			if (!this._glEndTime) {
 				this._glEndTime = 1;
-				this._glRender();
+				L.Util.requestAnimFrame(this._glRender, this);
 			}
 			return this;
 		},
@@ -226,7 +226,24 @@
 			var fps = 1000 / (end - this._glLastFrameTimestamp);
 			this.fire('glRenderFrame', {now: end, frameTime: frameTime, fps: fps});
 			this._glLastFrameTimestamp = end;
+		},
+
+
+
+		invalidateSize: function(options) {
+			mapProto.invalidateSize.call(this, options);
+
+			var size = this.getSize();
+			this._glCanvas.style.width  = size.x + 'px';
+			this._glCanvas.style.height = size.y + 'px';
+			this._glCanvas.width  = size.x;
+			this._glCanvas.height = size.y;
+			this._gl.viewportWidth  = this._glCanvas.width;
+			this._gl.viewportHeight = this._glCanvas.height;
+			this.glRenderOnce();
 		}
+
+
 	});
 
 

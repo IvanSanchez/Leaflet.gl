@@ -1,8 +1,8 @@
 
 // Adds the most very basic GL animation to L.Map: render the scene every
 //   time there is a 'move' or 'moveend' event.
-// In effect, this makes pan animations work seamlessly, as every pan frame
-//   fires a 'move' event.
+// In effect, this makes pan *and* flyTo animations work seamlessly, as
+//   every pan/flyTo frame fires a 'move' event.
 
 
 (function(){
