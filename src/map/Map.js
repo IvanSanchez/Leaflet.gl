@@ -32,6 +32,10 @@
 
 			this._glResizeCanvas();
 
+			// NOTE: Uncomment if enabling bearing-tilt rotation
+// 			this._bearing = this._bearing || 0;
+// 			this._tilt = this._tilt || 0;
+
 
 			// When clearing the canvas, set pixels to grey transparent
 			// This will make the fade-ins a bit prettier.
@@ -80,7 +84,7 @@
 				crs2clipspace +  vShader,	// Vertex shader
 				fShader,	// Fragment shader
 				attribs,	// Attributes
-				['uCenter', 'uHalfViewportSize'].concat(uniforms)	// crs2clipspace uniforms + program uniforms
+				['uTransformMatrix'].concat(uniforms)	// crs2clipspace uniforms + program uniforms
 			);
 
 			program.priority = priority;
@@ -167,6 +171,25 @@
 				this.fire('glRenderEnd', {now: performance.now()});
 			}
 
+			var view = this._glView;
+
+
+			// Given the center (in CRS units) and the half size of the viewport (in CRS units),
+			//   create a transformation matrix that will be passed to the shaders as an
+			//   uniform.
+			/// TODO: Simplify all matrix operations into just one
+			/// TODO: Implement bearing-tilt API. It works when uncommenting the
+			///   lines for multiplying by the rotation matrix.
+			var transformMatrix = L.GlUtil.identityMatrix();
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.translationMatrix([- view.center.x, - view.center.y, 0]));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -1]));
+// 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.zRotationMatrix(this._bearing));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1/view.halfSize.x, - 1/view.halfSize.y, 1]));
+// 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.xRotationMatrix(this._tilt));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -0.1]));
+
+// 			console.log(transformMatrix);
+
 			var gl = this._gl;
 
 			// Render the scene in several phases, switching shader programs
@@ -187,7 +210,6 @@
 			// These bits of data are set on a per-frame basis by the animations code,
 			//   by listening to the 'glPrepareFrame' event.
 			this.fire('glPrepareFrame');
-			var view = this._glView;
 
 			var i;
 			// The programs array comes pre-sorted from registerGlProgram().
@@ -199,8 +221,7 @@
 					gl.useProgram(program);
 
 					// Push crs2clipspace uniforms
-					gl.uniform2f(program.uniforms.uCenter, view.center.x, view.center.y);
-					gl.uniform2f(program.uniforms.uHalfViewportSize, view.halfSize.x, view.halfSize.y);
+					gl.uniformMatrix4fv(program.uniforms.uTransformMatrix, false, transformMatrix);
 
 					// Let each layer render itself using the program they need.
 					// The layer will rebind vertex attrib arrays and uniforms as needed

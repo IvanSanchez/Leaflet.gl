@@ -50,7 +50,7 @@
 				this.fire('tileerror', {
 					error: err,
 					tile: tile,
-					coords: coords
+					coords: tileCoords
 				});
 			}
 

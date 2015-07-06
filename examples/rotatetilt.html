@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang='en'>
+<meta charset="utf-8">
+<head>
+	<title>Leaflet GL demo</title>
+
+	<link rel="stylesheet" href="../Leaflet-1.0-dev/leaflet.css" />
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 	<script type="text/javascript" src="Leaflet-1.0-dev/leaflet.js"></script> -->
+	<script type="text/javascript" src="../Leaflet-1.0-dev/leaflet-src.js"></script>
+
+	<script src="../dist/Leaflet.gl.js"></script>
+</head>
+<body>
+
+	<h1>LeafletGL rotate demo</h1>
+
+	<p>The map canvas can easily rotate with bearing and tilt angles with a bit of magic in the transformation matrix.</p>
+
+	<div id="map" style='width:800px; height:600px;'></div>
+	<div>FPS:<span id="fps" style='border: gray 2px solid;'></span></div>
+	
+	<div>
+	Bearing:<input type="range" min="-180" max="180" value=0 step="1" name="rho" id='rho_input' /><span id='rho'></span>
+	</div>
+
+	<div>
+	Tilt:<input type="range" min="0" max="180" value=0 step="1" name="alpha" id='alpha_input' /><span id='alpha'></span>
+	</div>
+
+
+	<script type="text/javascript">
+
+		var bbox = L.latLngBounds(L.latLng(40, -10), L.latLng(50, 50));
+
+		var img = L.imageOverlay('logo.png', bbox, {opacity: 0.8});
+
+		var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			osm = L.tileLayer(osmUrl, {maxZoom: 18, attribution: osmAttrib});
+
+		var map = L.map('map')
+				.setView([0, 0], 0)
+				.addLayer(osm)
+				.addLayer(img)
+				;
+
+
+		map.on('glRenderStart', function(ev){
+			document.getElementById('fps').style.borderColor = 'red';
+// 			console.log('GL render start');
+		});
+		map.on('glRenderEnd', function(ev){
+			document.getElementById('fps').style.borderColor = 'grey';
+// 			console.log('GL render end');
+		});
+		map.on('glRenderFrame', function(ev){
+// 			console.log('GL render frame');
+		});
+		map.on('glRenderFrame glRenderStart glRenderEnd', function(ev){
+			document.getElementById('fps').innerHTML = L.Util.formatNum(ev.fps,2) + ' FPS';
+		});
+
+
+		document.getElementById('rho_input').addEventListener('change', rotate);
+		document.getElementById('rho_input').addEventListener('mousemove', rotate);
+
+		document.getElementById('alpha_input').addEventListener('change', rotate);
+		document.getElementById('alpha_input').addEventListener('mousemove', rotate);
+
+		function rotate(ev) {
+			if (ev.buttons === 0) return;
+
+			var rho   = document.querySelector('#rho_input').valueAsNumber;
+			var alpha = document.querySelector('#alpha_input').valueAsNumber;
+// 			console.log(angle);
+// 			map.setBearing(angle);
+			map._bearing = rho * Math.PI / 180;
+			map._tilt = alpha * Math.PI / 180;
+			map.glRenderOnce();
+		}
+
+		map._bearing = 0;
+		map._tilt = 0;
+
+
+	</script>
+</body>
+</html>
