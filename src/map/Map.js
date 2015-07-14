@@ -51,6 +51,7 @@
 			// Depth buffer is needed for rendering things on top of other things with
 			//   an explicit order
 			gl.enable(gl.DEPTH_TEST);
+			gl.depthFunc(gl.LEQUAL);
 
 		},
 
@@ -204,7 +205,9 @@
 			//   shaders for that phase.
 
 			gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+			gl.polygonOffset(0, 1);
+			
 
 			// Fetch center, half size in CRS units
 			// These bits of data are set on a per-frame basis by the animations code,

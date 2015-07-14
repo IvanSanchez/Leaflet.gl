@@ -60,7 +60,7 @@
 			var nw = this._map.options.crs.project( this._bounds.getNorthWest() );
 			var se = this._map.options.crs.project( this._bounds.getSouthEast() );
 
-			console.log(nw, se);
+// 			console.log(nw, se);
 
 			// Interleaved coordinate - textureCoords buffer
 			this._glData.set([
@@ -97,7 +97,7 @@
 
 			// Bind the interleaved vertices&attributes buffer to two different
 			//   attributes.
-			// An image is 5 floats = 20 bytes:
+			// A vertex is 5 floats = 20 bytes:
 			//   Vertices start at 0
 			//   Texture coords start after 3 floats = 12 bytes
 			var attribs = program.attributes;

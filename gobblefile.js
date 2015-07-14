@@ -4,7 +4,8 @@ var gobble = require('gobble');
 // Roughly equal to gobble([GLSL→JS, nativeJS]).include(...)
 var concatenatedJs = gobble([
 	gobble('shaders').transform('gl2js', {
-		format: 'string'
+		format: 'string',
+			
 	}),
 	gobble('src')
 ]).transform('include', {	// The first pass includes GLSL into JS

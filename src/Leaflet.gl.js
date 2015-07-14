@@ -9,5 +9,6 @@ if (L.Browser.gl) {
 #include <map/Map.js>
 #include <layer/tile/TileLayer.js>
 #include <layer/ImageOverlay.js>
+#include <layer/Sprite.js>
 
 }
