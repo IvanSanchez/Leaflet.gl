@@ -5,7 +5,10 @@ var gobble = require('gobble');
 var concatenatedJs = gobble([
 	gobble('shaders').transform('gl2js', {
 		format: 'string',
-			
+	}).map('replace',{
+		// glsl-unit has real problems with "discard".
+		foo: 'discard;',
+		delimiters: [ 'discard', ';' ]
 	}),
 	gobble('src')
 ]).transform('include', {	// The first pass includes GLSL into JS
