@@ -33,8 +33,8 @@
 			this._glResizeCanvas();
 
 			// NOTE: Uncomment if enabling bearing-tilt rotation
-// 			this._bearing = this._bearing || 0;
-// 			this._tilt = this._tilt || 0;
+			this._bearing = this._bearing || 0;
+			this._tilt = this._tilt || 0;
 
 
 			// When clearing the canvas, set pixels to grey transparent
@@ -184,9 +184,9 @@
 			var transformMatrix = L.GlUtil.identityMatrix();
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.translationMatrix([- view.center.x, - view.center.y, 0]));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -1]));
-// 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.zRotationMatrix(this._bearing));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.zRotationMatrix(this._bearing));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1/view.halfSize.x, - 1/view.halfSize.y, 1]));
-// 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.xRotationMatrix(this._tilt));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.xRotationMatrix(this._tilt));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -0.1]));
 
 // 			console.log(transformMatrix);
