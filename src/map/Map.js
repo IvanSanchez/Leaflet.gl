@@ -29,13 +29,10 @@
 			this._glPrograms = [];
 			this._glLayers = {};
 			this._glView = {};	// Center and half-size of the current view. Might change every frame.
+			this._glOpaqueTriangles = null;
+			this._glTransparentTriangles = null;
 
 			this._glResizeCanvas();
-
-			// NOTE: Uncomment if enabling bearing-tilt rotation
-			this._bearing = this._bearing || 0;
-			this._tilt = this._tilt || 0;
-
 
 			// When clearing the canvas, set pixels to grey transparent
 			// This will make the fade-ins a bit prettier.
@@ -67,60 +64,60 @@
 		//   might not attach itself to a program until some condition is met; or
 		//   it might detach and re-attach itself - that's why register and attach
 		//   are different functions.
-		registerGlProgram: function(programName, priority, vShader, fShader, attribs, uniforms) {
-			if (programName in this._glLayers) { return; }
-
-			this._glLayers[programName] = [];
-
-			var gl = this._gl;
-			if (!gl) {
-				throw Error('A layer tried to register a WebGL program before the map initialized its layout and WebGL context.');
-			}
-
-			/// TODO: Find a way to switch between crs2clipspace shader functions, to switch
-			///   between perspective models.
-			var crs2clipspace = include('crs2clipspace.v.js') + '\n' ;
-
-			var program = L.GlUtil.createProgram(gl,
-				crs2clipspace +  vShader,	// Vertex shader
-				fShader,	// Fragment shader
-				attribs,	// Attributes
-				['uTransformMatrix'].concat(uniforms)	// crs2clipspace uniforms + program uniforms
-			);
-
-			program.priority = priority;
-			program.name = programName;
-
-			// We're assuming all attributes will be in arrays
-			for (var attrib in program.attributes) {
-				gl.enableVertexAttribArray(program.attributes[attrib]);
-			}
-
-			this._glPrograms.push(program);
-			this._glPrograms.sort(function(a, b){return a.priority - b.priority});
-
-		},
-
-
-		// GL layers will want to tell the map which GL program they want
-		//   to use when rendering (akin to the map panes in non-GL).
-		attachLayerToGlProgram: function(layer, programName) {
-			if (!(programName in this._glLayers)) {
-				throw new Error('Layer tried to attach to a non-existing GL program');
-			}
-			this._glLayers[programName].push(layer);
-			return this;
-		},
-
-		// Reverse of attachLayerToGlProgram
-		detachLayerFromGlProgram: function(layer, programName) {
-			if (!(programName in this._glLayers)) {
-				throw new Error('Layer tried to detach from a non-existing GL program');
-			}
-			this._glLayers[programName].splice(
-				this._glLayers[programName].indexOf(layer), 1);
-			return this;
-		},
+// 		registerGlProgram: function(programName, priority, vShader, fShader, attribs, uniforms) {
+// 			if (programName in this._glLayers) { return; }
+//
+// 			this._glLayers[programName] = [];
+//
+// 			var gl = this._gl;
+// 			if (!gl) {
+// 				throw Error('A layer tried to register a WebGL program before the map initialized its layout and WebGL context.');
+// 			}
+//
+// 			/// TODO: Find a way to switch between crs2clipspace shader functions, to switch
+// 			///   between perspective models.
+// 			var crs2clipspace = include('crs2clipspace.v.js') + '\n' ;
+//
+// 			var program = L.GlUtil.createProgram(gl,
+// 				crs2clipspace +  vShader,	// Vertex shader
+// 				fShader,	// Fragment shader
+// 				attribs,	// Attributes
+// 				['uTransformMatrix'].concat(uniforms)	// crs2clipspace uniforms + program uniforms
+// 			);
+//
+// 			program.priority = priority;
+// 			program.name = programName;
+//
+// 			// We're assuming all attributes will be in arrays
+// 			for (var attrib in program.attributes) {
+// 				gl.enableVertexAttribArray(program.attributes[attrib]);
+// 			}
+//
+// 			this._glPrograms.push(program);
+// 			this._glPrograms.sort(function(a, b){return a.priority - b.priority});
+//
+// 		},
+//
+//
+// 		// GL layers will want to tell the map which GL program they want
+// 		//   to use when rendering (akin to the map panes in non-GL).
+// 		attachLayerToGlProgram: function(layer, programName) {
+// 			if (!(programName in this._glLayers)) {
+// 				throw new Error('Layer tried to attach to a non-existing GL program');
+// 			}
+// 			this._glLayers[programName].push(layer);
+// 			return this;
+// 		},
+//
+// 		// Reverse of attachLayerToGlProgram
+// 		detachLayerFromGlProgram: function(layer, programName) {
+// 			if (!(programName in this._glLayers)) {
+// 				throw new Error('Layer tried to detach from a non-existing GL program');
+// 			}
+// 			this._glLayers[programName].splice(
+// 				this._glLayers[programName].indexOf(layer), 1);
+// 			return this;
+// 		},
 
 		// Exposes this._gl
 		getGlContext: function() {
@@ -184,9 +181,9 @@
 			var transformMatrix = L.GlUtil.identityMatrix();
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.translationMatrix([- view.center.x, - view.center.y, 0]));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -1]));
-			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.zRotationMatrix(this._bearing));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.zRotationMatrix(this._bearing || 0));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1/view.halfSize.x, - 1/view.halfSize.y, 1]));
-			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.xRotationMatrix(this._tilt));
+			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.xRotationMatrix(this._tilt || 0));
 			transformMatrix = L.GlUtil.matrixMultiply(transformMatrix, L.GlUtil.scaleMatrix([1, -1, -0.1]));
 
 // 			console.log(transformMatrix);
@@ -214,25 +211,25 @@
 			//   by listening to the 'glPrepareFrame' event.
 			this.fire('glPrepareFrame');
 
-			var i;
-			// The programs array comes pre-sorted from registerGlProgram().
-			for (var programPriority in this._glPrograms) {
-				var program = this._glPrograms[programPriority];
-				var programName = program.name;
-
-				if (this._glLayers[programName].length) {
-					gl.useProgram(program);
-
-					// Push crs2clipspace uniforms
-					gl.uniformMatrix4fv(program.uniforms.uTransformMatrix, false, transformMatrix);
-
-					// Let each layer render itself using the program they need.
-					// The layer will rebind vertex attrib arrays and uniforms as needed
-					for (i in this._glLayers[programName]) {
-						this._glLayers[programName][i].glRender(program);
-					}
-				}
-			}
+// 			var i;
+// 			// The programs array comes pre-sorted from registerGlProgram().
+// 			for (var programPriority in this._glPrograms) {
+// 				var program = this._glPrograms[programPriority];
+// 				var programName = program.name;
+//
+// 				if (this._glLayers[programName].length) {
+// 					gl.useProgram(program);
+//
+// 					// Push crs2clipspace uniforms
+// 					gl.uniformMatrix4fv(program.uniforms.uTransformMatrix, false, transformMatrix);
+//
+// 					// Let each layer render itself using the program they need.
+// 					// The layer will rebind vertex attrib arrays and uniforms as needed
+// 					for (i in this._glLayers[programName]) {
+// 						this._glLayers[programName][i].glRender(program);
+// 					}
+// 				}
+// 			}
 
 			// A bit of accounting will come in handy for debugging.
 			var end = performance.now();
