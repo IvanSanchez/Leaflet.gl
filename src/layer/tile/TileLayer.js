@@ -37,8 +37,21 @@
 			map.detachLayerFromGlProgram(this, 'tile');
 		},
 
-		// Prevent creating an element and adding it to a map pane by doing nothing here.
+		// Prevent creating a HTML element and adding it to a map pane by doing nothing here.
 		_initContainer: function() {},
+
+
+		// Given a vertex from a GlTriangle, fill it with appropiate data
+		_fillVertex: function(vertex, crsX, crsY, crsZ, texS, texT, texID, alpha, age) {
+			vertex.setFloat32( 4, crsX);
+			vertex.setFloat32( 8, crsY);
+			vertex.setFloat32(12, crsZ);
+			vertex.setFloat32(16, texS);
+			vertex.setFloat32(20, texT);
+			vertex.setUInt32( 24, texID);
+			vertex.setFloat32(28, alpha);
+			vertex.setUInt32( 32, age);
+		},
 
 
 		// When the underlying image is done, create triangles
@@ -59,35 +72,38 @@
 			tile = this._tiles[key];
 			if (!tile) { return; }
 
-			// Pack data from this tile into a low-level array, which will
-			//   later form an interleaved array buffer.
-			// A tile is two triangles in a triangle strip, defined by 4 vertices.
-			// Each vertex has 3 coordinates, two texture coordinates, one age.
-			tile.glData = new Float32Array(24);
+
 			tile.age = performance.now();
 
 			var crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
 			var tileZoom = tile.coords.z;
 
-			tile.glData.set([
-				crsCoords.min.x, crsCoords.min.y, tileZoom,
-				0, 1,
-				tile.age,
+			tile.triangleA = this._map.getNewTriangle(this._shaderId);
+			tile.triangleB = this._map.getNewTriangle(this._shaderId);
 
-				crsCoords.max.x, crsCoords.min.y, tileZoom,
-				1, 1,
-				tile.age,
+			this._fillVertex(tile.triangleA.getVertex(0),
+				crsCoords.min.x, crsCoords.min.y, 0,
+				0, 1, this.options.opacity, age);
 
-				crsCoords.min.x, crsCoords.max.y, tileZoom,
-				0, 0,
-				tile.age,
+			this._fillVertex(tile.triangleA.getVertex(1),
+				crsCoords.max.x, crsCoords.min.y, 0,
+				1, 1, this.options.opacity, age);
 
-				crsCoords.max.x, crsCoords.max.y, tileZoom,
-				1, 0,
-				tile.age
-			]);
+			this._fillVertex(tile.triangleA.getVertex(2),
+				crsCoords.min.x, crsCoords.max.y, 0,
+				0, 1, this.options.opacity, age);
 
-			tile.texture = L.GlUtil.initTexture(this._map.getGlContext(), tile.el);
+			this._fillVertex(tile.triangleB.getVertex(2),
+				crsCoords.max.x, crsCoords.max.y, 0,
+				1, 0, this.options.opacity, age);
+
+			tile.triangleB.copyVertexFrom(0, tile.triangleA.getVertex(0));
+			tile.triangleB.copyVertexFrom(1, tile.triangleA.getVertex(1));
+
+			tile.triangleA.setZFighting(Math.abs(tile.coords.z - this._tileZoom));
+			tile.triangleB.setZFighting(Math.abs(tile.coords.z - this._tileZoom));
+
+// 			tile.texture = L.GlUtil.initTexture(this._map.getGlContext(), tile.el);
 
 			this.fire('tileload', {
 				tile: tile.el,
@@ -150,37 +166,37 @@
 		// This includes an interleaved vertices&attributes array,
 		//   and the texture array.
 		// This is what OpenLayers3 calls "batches" or "replays".
-		_getGlBuffers: function(){
-
-			if (this._glBuffers) {
-				return this._glBuffers;
-			}
-
-			var length = Object.keys(this._tiles).length;
-			var gl = this._map.getGlContext();
-
-			// Each tile is represented by 2 triangles in a triangle strip
-			//   = 6 coordinate pairs = 12 floats.
-			var bytesPerTile = 24;
-			var vertices = new Float32Array(length * bytesPerTile);
-			var i = 0;	// Count of tiles actually loaded
-			var textures = [];
-
-			for (var key in this._tiles) {
-				var tile = this._tiles[key];
-				if (tile.age) {
-					vertices.set(tile.glData, i * bytesPerTile);
-					textures[i] = tile.texture;
-					i ++;	// Tile count
-				}
-			}
-
-			return {
-				vertices: L.GlUtil.initBuffer(gl, vertices, gl.DYNAMIC_DRAW),
-				textures: textures,
-				length: i	// tile count
-			};
-		},
+// 		_getGlBuffers: function(){
+//
+// 			if (this._glBuffers) {
+// 				return this._glBuffers;
+// 			}
+//
+// 			var length = Object.keys(this._tiles).length;
+// 			var gl = this._map.getGlContext();
+//
+// 			// Each tile is represented by 2 triangles in a triangle strip
+// 			//   = 6 coordinate pairs = 12 floats.
+// 			var bytesPerTile = 24;
+// 			var vertices = new Float32Array(length * bytesPerTile);
+// 			var i = 0;	// Count of tiles actually loaded
+// 			var textures = [];
+//
+// 			for (var key in this._tiles) {
+// 				var tile = this._tiles[key];
+// 				if (tile.age) {
+// 					vertices.set(tile.glData, i * bytesPerTile);
+// 					textures[i] = tile.texture;
+// 					i ++;	// Tile count
+// 				}
+// 			}
+//
+// 			return {
+// 				vertices: L.GlUtil.initBuffer(gl, vertices, gl.DYNAMIC_DRAW),
+// 				textures: textures,
+// 				length: i	// tile count
+// 			};
+// 		},
 
 
 
@@ -188,38 +204,38 @@
 		// glRender() must re-attach vertices&attributes buffers,
 		//    layer-specific uniforms, and do the low-level calls to render
 		//    whatever geometries are needed.
-		glRender: function(program, programName) {
-			var gl = this._map.getGlContext();
-			var buffers = this._getGlBuffers();
-
-			gl.uniform1f(program.uniforms.uTileZoom, this._tileZoom);
-			gl.uniform1f(program.uniforms.uNow, performance.now());
-
-			// Bind the interleaved vertices&attributes buffer to three different
-			//   attributes.
-			// Each tile is 12 floats = 24 bytes:
-			//   Vertices start at 0
-			//   Texture coords start after 3 floats = 12 bytes
-			//   Tile age starts after 5 floats = 20 bytes
-			var attribs = program.attributes;
-			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertices);
-			gl.vertexAttribPointer(attribs.aCRSCoords,     3, gl.FLOAT, false, 24, 0);
-			gl.vertexAttribPointer(attribs.aTextureCoords, 2, gl.FLOAT, false, 24, 12);
-			gl.vertexAttribPointer(attribs.aAge,           1, gl.FLOAT, false, 24, 20);
-
-			// Render tiles one by one. Bit inefficient, but simpler at
-			//   this stage in development.
-			for (var i=0; i< buffers.length; i++) {
-
-				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, buffers.textures[i]);
-				gl.uniform1i(program.uniforms.uTexture, 0);
-
-				// A tile is two triangles = 4 vertices
-				gl.drawArrays(gl.TRIANGLE_STRIP, i * 4, 4);
-// 				gl.drawArrays(gl.LINE_LOOP, j, 4);
-			}
-		}
+// 		glRender: function(program, programName) {
+// 			var gl = this._map.getGlContext();
+// 			var buffers = this._getGlBuffers();
+//
+// 			gl.uniform1f(program.uniforms.uTileZoom, this._tileZoom);
+// 			gl.uniform1f(program.uniforms.uNow, performance.now());
+//
+// 			// Bind the interleaved vertices&attributes buffer to three different
+// 			//   attributes.
+// 			// Each tile is 12 floats = 24 bytes:
+// 			//   Vertices start at 0
+// 			//   Texture coords start after 3 floats = 12 bytes
+// 			//   Tile age starts after 5 floats = 20 bytes
+// 			var attribs = program.attributes;
+// 			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertices);
+// 			gl.vertexAttribPointer(attribs.aCRSCoords,     3, gl.FLOAT, false, 24, 0);
+// 			gl.vertexAttribPointer(attribs.aTextureCoords, 2, gl.FLOAT, false, 24, 12);
+// 			gl.vertexAttribPointer(attribs.aAge,           1, gl.FLOAT, false, 24, 20);
+//
+// 			// Render tiles one by one. Bit inefficient, but simpler at
+// 			//   this stage in development.
+// 			for (var i=0; i< buffers.length; i++) {
+//
+// 				gl.activeTexture(gl.TEXTURE0);
+// 				gl.bindTexture(gl.TEXTURE_2D, buffers.textures[i]);
+// 				gl.uniform1i(program.uniforms.uTexture, 0);
+//
+// 				// A tile is two triangles = 4 vertices
+// 				gl.drawArrays(gl.TRIANGLE_STRIP, i * 4, 4);
+// // 				gl.drawArrays(gl.LINE_LOOP, j, 4);
+// 			}
+// 		}
 
 	});
 

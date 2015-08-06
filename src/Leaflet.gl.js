@@ -10,7 +10,7 @@ if (L.Browser.gl) {
 #include <map/anim/Map.GlZoomAnimation.js>
 #include <map/Map.js>
 #include <layer/tile/TileLayer.js>
-// #include <layer/ImageOverlay.js>
-// #include <layer/Sprite.js>
+// # include <layer/ImageOverlay.js>
+// # include <layer/Sprite.js>
 
 }

@@ -24,12 +24,14 @@ L.GlTriangle = L.Class.extend({
 		this._dataView.setUInt32(64+60, ++L.Util.lastId);	// Set new triangle ID
 	},
 
-
-	// Gets a raw DataView for the 0th, 1st or 2nd vertex.
-	getVertex: function(index) {
-		return new DataView(this._dataView.buffer, i * 64, 60);
-	},
-
+	// Fills the i-th vertex with the given data
+	// GlTriangle should be subclassed to allow for different .fill() functions.
+	fillVertex: function(index, crsX, crsY, crsZ) {
+		var offset = index * 64;
+		this._dataView.setFloat32(offset + 4, crsX);
+		this._dataView.setFloat32(offset + 8, crsY);
+		this._dataView.setFloat32(offset + 12, crsZ);
+	}
 
 	setClipspaceZ: function(z) { return this._dataView.setFloat32(60, z); },
 	getClipspaceZ: function() { return this._dataView.getFloat32(60); },
@@ -43,9 +45,6 @@ L.GlTriangle = L.Class.extend({
 		this._dataView.setUInt32(64+60, 0);
 	},
 	getID: function() { return this._dataView.getUInt32(64+60); },
-
-
-
 
 });
 

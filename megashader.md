@@ -33,7 +33,8 @@ The vertex data is different between primitives:
 | Line next vertex CRS    | float * 3 |    12 |      |          |        |  X   |      |
 | Line width              | float * 1 |     4 |      |          |        |  X   |      |
 | Line side               | 1 bit     |     1 |      |          |        |  X   |      |
-|                         |           |       |  20  |  20      |  32    | 56/57 | 28  |
+| Age                     | int32 * 1 |     4 |  X   |  X       |        |      |      |
+|                         |           |       |  24  |  24      |  32    | 56/57 | 28  |
 
 Vertices for lines need to hold the previous and next vertex in order to calculate the normal vector (or rather, the "extrusion vector" as per Mapbox nomenclature). The line side specifies if the vertex has to be extruded to the left or to the right.
 
@@ -61,7 +62,7 @@ Line width could be factored by a number (e.g. an integer amount of hundredths o
 |       20 |        5 | tex t  | tex t    | tex t    | col g  | col g  |        |
 |       24 |        6 | tex id | tex id   | tex id   | col b  | col b  |        |
 |       38 |        7 | col a  | col a    | col a    | col a  | col a  |        |
-|       32 |        8 |        |          | offset x | prev x |        |        |
+|       32 |        8 | age    | age      | offset x | prev x |        |        |
 |       36 |        9 |        |          | offset y | prev y |        |        |
 |       40 |       10 |        |          |          | prev z |        |        |
 |       44 |       11 |        |          |          | next x |        |        |

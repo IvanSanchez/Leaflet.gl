@@ -22,21 +22,33 @@ L.GlTriangleArray = L.Class.extend({
 		this._usedSize = 0;
 		this._triangleCount = 0;
 
-		// Buffer accessor so that the sorting algorithm can copy chunks of memory
+		// Buffer accessors so that the sorting algorithm can copy chunks of memory
 		//   around
 		this._byteView = new Uint8Array(this._buffer, 0, this._maxSize + 192);
+		this._dataView = new DataView(this._buffer, 0, this._maxSize + 192);
+
+
+		// Stores references to instances to GlTriangles.
+		this._trianglesById = {};
+
+		// Stores references to each triangle's DataView.
+		// Used in the sorting algorithm to re-reference all triangles.
+		this._triangleRawViews = [];
 
 	},
 
 
 	_grow: function() {
-		/// TODO: Use ArrayBuffer.transfer() if available. This is experimental, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transfer
+		/// TODO: Use ArrayBuffer.transfer() if available. That is experimental,
+		///   see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transfer
 
 		this._maxSize += this._growSize;
 		var newBuffer = ArrayBuffer(this._maxSize + 192);
 
 		newBuffer.set(this._buffer, 0);
 		this._buffer = newBuffer;
+		this._byteView = new Uint8Array(this._buffer, 0, this._maxSize + 192);
+		this._dataView = new DataView(this._buffer, 0, this._maxSize + 192);
 	},
 
 
@@ -47,16 +59,40 @@ L.GlTriangleArray = L.Class.extend({
 			this._grow();
 		}
 
+		//// WARNING: This will create a triangle based on a memory slot...
+		////   which means the contents of the triangle WILL change whenever
+		////   the triangle array gets sorted!!!!!!
 		var triangle = new L.GlTriangle(
 			new DataView(this._buffer, this._usedSize, 192 ),
 			shaderId
 		);
 
 		this._usedSize += 192;
+
+		/// TODO:
+		// * Create an entry in a "raw triangle dataviews" array. This is a javascript
+		//     array, 0-indexed, pointing to a set of raw DataViews.
+		// * Create an entry in a "triangles-by-ID" map. This is a javascript object,
+		//     with triangle IDs as keys and L.GlTriangles as values
+		// * Whenever the sorting algorithm runs, reset the (private) _dataView property
+		//     of each GlTriangle to one of the (already instantiated) elements from the
+		//     "raw triangle dataviews" array.
+
+		this._trianglesById[ triangle.getId() ] = triangle;
+		this._triangleRawViews[triangleCount] = triangle._dataView;
+
 		this._triangleCount++;
 
 		return triangle;
 	},
+
+
+
+	/// FIXME!!!
+	getTriangleById: function(id) {
+
+	},
+
 
 
 	// In-place quicksort algorithm
@@ -107,8 +143,9 @@ L.GlTriangleArray = L.Class.extend({
 		// There are several ways to copy stuff inside an ArrayBuffer, see
 		//   https://jsperf.com/typedarray-set-vs-loop/4
 		// Ideally I'd like to use copyWithin, but as of 2015 it's not really
-		//   cross-browser. Setting subarrays should be just as efficient, even
-		//   if readability suffers a bit.
+		//   cross-browser. Setting subarrays should be just as efficient (they
+		//   should both compile to a memcpy in bytecode), even if readability
+		//   suffers a bit.
 
 		var tI = this._byteView.subarray(192 * i, 192 * (i+1));
 		var tJ = this._byteView.subarray(192 * j, 192 * (j+1));
@@ -126,26 +163,31 @@ L.GlTriangleArray = L.Class.extend({
 	// Heuristics are applied here: the algorithm tries to put together
 	//   triangles with shared textures, etc to minimize context changes.
 	_compare: function(a, b) {
-		var tA = this._byteView.subarray(192 * a, 192 * (a+1));
-		var tB = this._byteView.subarray(192 * b, 192 * (b+1));
+		/// TODO: Replace subarrays with refs to the "raw triangle dataviews" array
+		///   (typedArrays do not have getFloat() (etc) methods.
+		var offsetA = 192 * a;
+		var offsetB = 192 * b;
 		var delta;
 
 		// Push triangles with a ID of zero to the end of the array
-		if (tA.getUInt32(64+60) === 0) return true;
-		if (tB.getUInt32(64+60) === 0) return false;
+		if (this._dataView.getUInt32(offsetA + 64+60) === 0) return true;
+		if (this._dataView.getUInt32(offsetB + 64+60) === 0) return false;
 
 		// First, compare the clipspace Z-coordinate
-		delta = tA.getFloat32(60) - tB.getFloat32(60);
+		delta = this._dataView.getFloat32(offsetA + 60) -
+		        this._dataView.getFloat32(offsetB + 60);
 		if (delta < 0) return false;
 		if (delta > 0) return true;
 
 		// At same Z-coordinate, apply Z-fighting
-		delta = tA.getFloat32(128 + 60) - tB.getFloat32(128 + 60);
+		delta = this._dataView.getFloat32(offsetA + 128 + 60) -
+		        this._dataView.getFloat32(offsetB + 128 + 60);
 		if (delta < 0) return false;
 		if (delta > 0) return true;
 
 		// At same Z-fighting, break ties by texture ID.
-		delta = tA.getFloat32(128 + 60) - tB.getFloat32(128 + 60);
+		delta = this._dataView.getFloat32(offsetA + 24) -
+		        this._dataView.getFloat32(offsetB + 24);
 		if (delta < 0) return false;
 		if (delta > 0) return true;
 
