@@ -53,16 +53,22 @@ L.GlTriangleArray = L.Class.extend({
 
 
 	// A simple Factory pattern
-	getNewTriangle: function(shaderId) {
+	// Specify the shader ID to store in the first byte, and
+	//   the subclass of L.GlTriangle to use.
+	getNewTriangle: function(shaderId, trigProto) {
 
 		if (this._usedSize + 192 > this._maxSize) {
 			this._grow();
 		}
 
+		if (!trigProto) { trigProto = L.GlTriangle; }
+
 		//// WARNING: This will create a triangle based on a memory slot...
 		////   which means the contents of the triangle WILL change whenever
 		////   the triangle array gets sorted!!!!!!
-		var triangle = new L.GlTriangle(
+		//// This is alleviated by the sort() function re-arranging the private
+		////   _dataView of each triangle after each sort operation.
+		var triangle = new trigProto(
 			new DataView(this._buffer, this._usedSize, 192 ),
 			shaderId
 		);
@@ -87,11 +93,19 @@ L.GlTriangleArray = L.Class.extend({
 	},
 
 
+	getNewQuad: function(shaderId, trigProto) {
 
-	/// FIXME!!!
-	getTriangleById: function(id) {
+		return new L.GlQuad(
+			this.getNewTriangle(shaderId, trigProto),
+			this.getNewTriangle(shaderId, trigProto)
+		);
 
 	},
+
+// 	/// FIXME!!!
+// 	getTriangleById: function(id) {
+//
+// 	},
 
 
 

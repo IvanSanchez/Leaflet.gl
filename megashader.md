@@ -49,27 +49,27 @@ Line width could be factored by a number (e.g. an integer amount of hundredths o
 
 64 bytes per vertex seems like a reasonable number (64*3 = 192 bytes per triangle). After all, we computer guys love powers of 2. Also, keep in mind that vertex attributes are ([usually](http://codeflow.org/entries/2013/feb/22/how-to-write-portable-webgl/#maximum-vertex-attributes)) limited to 16. A few things overlap between primitives, so let's go with:
 
-| Offset   | 4-Index  | Tile   | Img over | Sprite   | Line   | Fill   | Notes  |
-| -------: | -------: | :----: | :------: | :------: | :----: | :----: | ------ |
-|        0 |        0 | subshader | subshader | subshader | subshader | subshader | 1 byte |
-|        1 |      0+1 | flags  | flags    | flags    | flags  | flags  | 1 byte: megashader |
-|        2 |      0+2 | flags  | flags    | flags    | flags  | flags  | 1 byte: subshader |
-|        3 |      0+3 |        |          |          |        |        | 1 byte: Padding |
-|        4 |        1 | CRS x  | CRS x    | CRS x    | CRS x  | CRS x  |        |
-|        8 |        2 | CRS y  | CRS y    | CRS y    | CRS y  | CRS y  |        |
-|       12 |        3 | CRS z  | CRS z    | CRS z    | CRS z  | CRS z  |        |
-|       16 |        4 | tex s  | tex s    | tex s    | col r  | col r  |        |
-|       20 |        5 | tex t  | tex t    | tex t    | col g  | col g  |        |
-|       24 |        6 | tex id | tex id   | tex id   | col b  | col b  |        |
-|       38 |        7 | col a  | col a    | col a    | col a  | col a  |        |
-|       32 |        8 | age    | age      | offset x | prev x |        |        |
-|       36 |        9 |        |          | offset y | prev y |        |        |
-|       40 |       10 |        |          |          | prev z |        |        |
-|       44 |       11 |        |          |          | next x |        |        |
-|       48 |       12 |        |          |          | next y |        |        |
-|       52 |       13 |        |          |          | next z |        |        |
-|       56 |       14 |        |          |          | width  |        |        |
-|       60 |       15 |        |          |          |        |        | Interleaved data |
+| Offset   | 4-Index  | Tile   | Img over | Sprite   | Line   | Fill   | Type | Varying? | Notes  |
+| -------: | -------: | :----: | :------: | :------: | :----: | :----: | :--: | :------: | ------ |
+|        0 |        0 | subshader | subshader | subshader | subshader | subshader | 1 byte | ✔ |    |
+|        1 |      0+1 | flags  | flags    | flags    | flags  | flags  | 1 byte |  ✔     | megashader |
+|        2 |      0+2 | flags  | flags    | flags    | flags  | flags  | 1 byte |  ✔     | subshader |
+|        3 |      0+3 |        |          |          |        |        | 1 byte |  ✔     | Padding |
+|        4 |        1 | CRS x  | CRS x    | CRS x    | CRS x  | CRS x  | vec3   |  ✗
+|        8 |        2 | CRS y  | CRS y    | CRS y    | CRS y  | CRS y  |   ↑    |  ✗
+|       12 |        3 | CRS z  | CRS z    | CRS z    | CRS z  | CRS z  |   ↑    |  ✗
+|       16 |        4 | tex s  | tex s    | tex s    | col r  | col r  | vec4   |  ✔
+|       20 |        5 | tex t  | tex t    | tex t    | col g  | col g  |   ↑    |  ✔
+|       24 |        6 | tex id | tex id   | tex id   | col b  | col b  |   ↑    |  ✔
+|       38 |        7 | col a  | col a    | col a    | col a  | col a  |   ↑    |  ✔
+|       32 |        8 |        |          | offset x | prev x |        | vec3   |  ✗
+|       36 |        9 |        |          | offset y | prev y |        |   ↑    |  ✗
+|       40 |       10 |        |          |          | prev z |        |   ↑    |  ✗
+|       44 |       11 |        |          |          | next x |        | vec3   |  ✗
+|       48 |       12 |        |          |          | next y |        |   ↑    |  ✗
+|       52 |       13 |        |          |          | next z |        |   ↑    |  ✗
+|       56 |       14 | age    | age      |          | width  |        | int32  |  ✗
+|       60 |       15 |        |          |          |        |        |        |        | Interleaved data |
 
 * Subshader: which subshader to use (tile, sprite, line, etc)
 * Megashader flags include opaqueness hint
@@ -81,7 +81,7 @@ Line width could be factored by a number (e.g. an integer amount of hundredths o
 	* _leaflet_id (to delete triangles when needed)
 	* z-fighting index
 
-* Colour and opacity might be packed as 4 int8s instead of as 4 float32s.
+* Colour and opacity might be packed as 4 int8s instead of as 4 float32s if really needed.
 
 ## Needed changes to the API
 

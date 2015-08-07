@@ -19,13 +19,22 @@ L.GlQuad = L.Class.extend({
 			triangleA.fillVertex.call(arguments);
 			triangleB.fillVertex.call(arguments);
 		} else if (index === 3) {
-			var args = Array.prototype.slice.call(arguments);
-			args[0] = 0;	// Set index to zero instead of 3
-			triangleB.fillVertex.call(args);
+			arguments[0] = 0;	// Set vertex index to zero instead of 3
+			triangleB.fillVertex.call(arguments);
 		}
 	},
 
+	purge: function() {
+		this._a.purge();
+		this._b.purge();
+	},
 
+	setZFighting: function(z) {
+		this._a.setZFighting(z);
+		this._b.setZFighting(z);
+	},
+
+	getZFighting: function() { return this._a.getZFighting(z); }
 
 
 });

@@ -28,6 +28,13 @@ http://ivansanchez.github.io/Leaflet.gl/demo.html
 
 ## Development
 
+
+### Documentation build
+
+For the megashader docs, run `pandoc megashader.md --latex-engine=xelatex -t latex -o megashader.pdf`. You'll need `pandoc` and `texlive-xetex`.
+
+
+
 ### Build system
 
 A [gobble](https://github.com/gobblejs/gobble) toolchain is needed to mix the javascript with the GLSL shaders and create something that a web browser can understand. This kinda like browserify but not exactly.

@@ -29,6 +29,13 @@
 				['uNow', 'uTexture', 'uTileZoom']	// Uniforms
 			);
 			map.attachLayerToGlProgram(this, 'tile');
+
+			/// TODO: Replace with registerGlSubshader()
+			/// TODO: Fetch the subshader ID and store it in this._shaderId
+
+			/// FIXME: For now use a hardcoded value which is replicated in core.*.glsl.
+			this._shaderId = 1;
+
 		},
 
 		onRemove: function(map) {
@@ -39,19 +46,6 @@
 
 		// Prevent creating a HTML element and adding it to a map pane by doing nothing here.
 		_initContainer: function() {},
-
-
-		// Given a vertex from a GlTriangle, fill it with appropiate data
-		_fillVertex: function(vertex, crsX, crsY, crsZ, texS, texT, texID, alpha, age) {
-			vertex.setFloat32( 4, crsX);
-			vertex.setFloat32( 8, crsY);
-			vertex.setFloat32(12, crsZ);
-			vertex.setFloat32(16, texS);
-			vertex.setFloat32(20, texT);
-			vertex.setUInt32( 24, texID);
-			vertex.setFloat32(28, alpha);
-			vertex.setUInt32( 32, age);
-		},
 
 
 		// When the underlying image is done, create triangles
@@ -78,32 +72,30 @@
 			var crsCoords = this._tileCoordsToProjectedBounds(tileCoords);
 			var tileZoom = tile.coords.z;
 
-			tile.triangleA = this._map.getNewTriangle(this._shaderId);
-			tile.triangleB = this._map.getNewTriangle(this._shaderId);
+			tile.quad = this._map.getNewGlQuad(this._shaderId, L.GlTriangle.Textured /* , opaqueness hint*/);
 
-			this._fillVertex(tile.triangleA.getVertex(0),
-				crsCoords.min.x, crsCoords.min.y, 0,
-				0, 1, this.options.opacity, age);
-
-			this._fillVertex(tile.triangleA.getVertex(1),
-				crsCoords.max.x, crsCoords.min.y, 0,
-				1, 1, this.options.opacity, age);
-
-			this._fillVertex(tile.triangleA.getVertex(2),
-				crsCoords.min.x, crsCoords.max.y, 0,
-				0, 1, this.options.opacity, age);
-
-			this._fillVertex(tile.triangleB.getVertex(2),
-				crsCoords.max.x, crsCoords.max.y, 0,
-				1, 0, this.options.opacity, age);
-
-			tile.triangleB.copyVertexFrom(0, tile.triangleA.getVertex(0));
-			tile.triangleB.copyVertexFrom(1, tile.triangleA.getVertex(1));
-
-			tile.triangleA.setZFighting(Math.abs(tile.coords.z - this._tileZoom));
-			tile.triangleB.setZFighting(Math.abs(tile.coords.z - this._tileZoom));
-
+			/// TODO: Get texture ID, texture bounds from this._map - probably will
+			///   do some automatic atlassing in the future.
 // 			tile.texture = L.GlUtil.initTexture(this._map.getGlContext(), tile.el);
+
+			tile.quad.fillVertex(0,
+				crsCoords.min.x, crsCoords.min.y, 0,
+				0, 1, texID, this.options.opacity, age);
+
+			tile.quad.fillVertex(1,
+				crsCoords.max.x, crsCoords.min.y, 0,
+				1, 1, texID, this.options.opacity, age);
+
+			tile.quad.fillVertex(2,
+				crsCoords.min.x, crsCoords.max.y, 0,
+				0, 1, texID, this.options.opacity, age);
+
+			tile.quad.fillVertex(3,
+				crsCoords.max.x, crsCoords.max.y, 0,
+				1, 0, texID, this.options.opacity, age);
+
+			tile.quad.setZFighting(Math.abs(tile.coords.z - this._tileZoom));
+
 
 			this.fire('tileload', {
 				tile: tile.el,
@@ -147,7 +139,7 @@
 			window.setTimeout(function(){
 				// Wait a bit until other tiles have faded in
 				this._map.getGlContext().deleteTexture(tile.texture);
-				delete this._tiles[key];
+				tile.quad.purge();
 			}.bind(this), 500);
 
 			this.fire('tileunload', {
